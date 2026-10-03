@@ -1161,9 +1161,14 @@
             <span class="crumb-item" data-path="">🏠 /</span>
           </div>
 
-          <!-- フォルダ追加/変更ボタン (明示的タップ用) -->
-          <label for="folder-picker-input" class="wood-btn" style="cursor: pointer;" title="音楽フォルダを選択">
+          <!-- フォルダ追加/変更ボタン (明示的タップ用: PC / このiPhone内) -->
+          <label for="folder-picker-input" class="wood-btn" style="cursor: pointer;" title="フォルダを選択（PC / このiPhone内）">
             <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+          </label>
+
+          <!-- ファイル複数選択ボタン (Google Drive / OneDriveなどのクラウド対応) -->
+          <label for="files-picker-input" class="wood-btn" style="cursor: pointer;" title="ファイルを選択（Google Drive / OneDrive対応）">
+            <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
           </label>
         </div>
 
@@ -1171,16 +1176,16 @@
         <div class="file-list-container">
           <div id="empty-state" class="empty-state">
             <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12 9l-4 4h3v4h2v-4h3l-4-4z"/></svg>
-            <h3>音楽フォルダが選択されていません</h3>
-            <p>スマホやPC内の音楽ファイルが入ったフォルダを選択してください。<br>（オフライン・機内モードでもそのまま再生できます）</p>
+            <h3>音楽フォルダまたはファイルを選択</h3>
+            <p>スマホやPC内の音楽を選択してください。<br>※ iPhoneでGoogle DriveやOneDrive内の曲を選ぶ場合は<strong>「ファイルで選択」</strong>を使用してください（iOSの仕様）。</p>
             <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-              <label for="folder-picker-input" class="wood-btn" style="padding: 10px 16px;">
+              <label for="folder-picker-input" class="wood-btn" style="padding: 10px 16px;" title="PCやiPhone本体内のフォルダを選択">
                 <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 フォルダを選択
               </label>
-              <label for="files-picker-input" class="wood-btn" style="padding: 10px 14px; opacity: 0.9;" title="フォルダ選択が効かない端末向け">
-                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                ファイルで選択
+              <label for="files-picker-input" class="wood-btn" style="padding: 10px 14px; opacity: 0.9;" title="Google Drive / OneDriveなどのクラウドや単曲用">
+                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                ファイルで選択 (Google/OneDrive対応)
               </label>
             </div>
           </div>
@@ -2478,17 +2483,49 @@
         renderList();
       });
 
+      // 読み込み完了時の共通処理（必要に応じてレジューム復帰を試行）
+      function handleLoadedFiles(files, tryResume = false) {
+        if (!files || files.length === 0) return;
+        parseFiles(files);
+
+        const targetFileName = localStorage.getItem(STORAGE_KEY_FILE);
+        const resumeSec = parseFloat(localStorage.getItem(STORAGE_KEY_TIME) || '0');
+
+        if (tryResume && targetFileName) {
+          let matchedIndex = -1;
+          for (let i = 0; i < playlist.length; i++) {
+            if (playlist[i].name === targetFileName) {
+              matchedIndex = i;
+              break;
+            }
+          }
+
+          if (matchedIndex !== -1) {
+            playTrackByIndex(matchedIndex, resumeSec, false);
+            const resumeTrack = playlist[matchedIndex];
+            showToast(`「${formatTrackDisplayTitle(resumeTrack)}」を${formatTime(resumeSec)}で待機しました`);
+          } else {
+            showToast('前回の曲が見つかりませんでした');
+            restoreMinibarToNormal();
+            if (playlist.length > 0) {
+              playTrackByIndex(0, 0, false);
+            }
+          }
+        }
+      }
+
       // フォルダインプットの変更検知
       folderPickerInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files.length > 0) {
-          parseFiles(e.target.files);
+          handleLoadedFiles(e.target.files, false);
         }
       });
 
-      // ファイルインプット（複数曲選択）の変更検知
+      // ファイルインプット（複数曲選択）の変更検知 (Google Drive / OneDrive対応)
       filesPickerInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files.length > 0) {
-          parseFiles(e.target.files);
+          const hasResume = !!localStorage.getItem(STORAGE_KEY_FILE) && currentTrackIndex === -1;
+          handleLoadedFiles(e.target.files, hasResume);
         }
       });
 
@@ -2842,49 +2879,26 @@
           playerTitle.textContent = title;
           playerFolder.textContent = `前回の曲 (${formatTime(lastTime)}〜)`;
 
-          // 右端ボタンを <label> による [ 📂 続きをロード ] ボタンに置き換え
+          // 右端ボタンを <label> による [ 📂 続きをロード ] ボタンに置き換え（フォルダ & クラウドファイル両対応）
           minibarActionArea.innerHTML = `
-            <label for="resume-picker-input" class="resume-label-btn" title="前回の続きから再生">
-              <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-              <span>続きをロード</span>
-            </label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label for="resume-picker-input" class="resume-label-btn" title="フォルダから続きをロード（本体内 / PC）">
+                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                <span>フォルダ</span>
+              </label>
+              <label for="files-picker-input" class="resume-label-btn" title="ファイルから続きをロード（Google Drive / OneDrive対応）">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                <span>ファイル</span>
+              </label>
+            </div>
           `;
         }
       }
 
       // レジューム選択時の処理
       resumePickerInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        const targetFileName = localStorage.getItem(STORAGE_KEY_FILE);
-        const resumeSec = parseFloat(localStorage.getItem(STORAGE_KEY_TIME) || '0');
-
-        // まずファイルシステム全体として取り込む
-        parseFiles(files);
-
-        // 一致するファイルを検索
-        let matchedIndex = -1;
-        for (let i = 0; i < playlist.length; i++) {
-          if (playlist[i].name === targetFileName) {
-            matchedIndex = i;
-            break;
-          }
-        }
-
-        if (matchedIndex !== -1) {
-          // 一致した場合: 前回の秒数をセットし、一時停止状態でスタンバイ
-          playTrackByIndex(matchedIndex, resumeSec, false);
-          const resumeTrack = playlist[matchedIndex];
-          showToast(`「${formatTrackDisplayTitle(resumeTrack)}」を${formatTime(resumeSec)}で待機しました`);
-        } else {
-          // 見つからなかった場合
-          showToast('前回の曲が見つかりませんでした');
-          restoreMinibarToNormal();
-          if (playlist.length > 0) {
-            // 通常の1曲目で待機
-            playTrackByIndex(0, 0, false);
-          }
+        if (e.target.files && e.target.files.length > 0) {
+          handleLoadedFiles(e.target.files, true);
         }
       });
 
