@@ -1070,8 +1070,8 @@
         width: 100%;
         height: auto;
         aspect-ratio: 1 / 1;
-        max-height: 48vh;
-        max-width: min(48vh, 520px);
+        max-height: 45vh;
+        max-width: min(45vh, 480px);
         margin: 0 auto 4px auto;
         flex-shrink: 1;
         box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
@@ -1320,6 +1320,134 @@
       }
     }
 
+    /* 手動レイアウト切替ボタン (ヘッダー右上) */
+    .btn-layout-toggle {
+      min-height: 26px;
+      height: 26px;
+      padding: 0 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 6px;
+      gap: 3px;
+      background: linear-gradient(to bottom, #fffaf2 0%, #ebd4b8 60%, #dfbc94 100%);
+      color: var(--wood-shadow);
+      border: 1px solid rgba(159, 113, 62, 0.45);
+      box-shadow: 0 1px 3px rgba(102, 67, 30, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+    }
+    .btn-layout-toggle:hover {
+      filter: brightness(1.05);
+      border-color: var(--amber-glow);
+    }
+    .btn-layout-toggle.active {
+      background: linear-gradient(to bottom, #dfbc94 0%, #caa06d 100%);
+      color: #381f08;
+      box-shadow: inset 0 1px 3px rgba(80, 45, 15, 0.4);
+      border-color: #9f713e;
+    }
+
+    /* ==========================================================================
+       【手動2画面モード】body.two-column-mode
+       自動判定で2画面にならなかった場合でも強制的に「左: 選曲 / 右: 再生中」を横並び表示
+       ========================================================================== */
+    body.two-column-mode {
+      overflow-y: hidden;
+    }
+
+    body.two-column-mode #app-container {
+      max-width: 100% !important;
+      width: 100% !important;
+      height: 100vh;
+      height: 100dvh;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+    }
+
+    /* 上部の「選曲 / 再生中」タブボタン、および下部ミニバーを非表示 */
+    body.two-column-mode .tab-nav,
+    body.two-column-mode #minibar {
+      display: none !important;
+    }
+
+    body.two-column-mode main {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 10px !important;
+      padding: 6px 12px !important;
+      overflow: hidden !important;
+      margin-bottom: 0 !important;
+      flex: 1 !important;
+      min-height: 0 !important;
+    }
+
+    /* 選曲画面と再生画面の両方を強制表示（タブ切り替えのdisplay:noneを徹底無効化） */
+    body.two-column-mode .screen-view,
+    body.two-column-mode #view-list,
+    body.two-column-mode #view-player,
+    body.two-column-mode #view-now {
+      position: relative !important;
+      display: flex !important;
+      height: 100% !important;
+      border-radius: 12px;
+      border: 1.5px solid rgba(184, 138, 85, 0.45);
+      background: rgba(255, 250, 243, 0.7);
+      box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.12);
+      padding: 8px 12px;
+      overflow-y: auto;
+    }
+
+    /* 左カラム（リスト）: 幅 320px〜350px 固定 */
+    body.two-column-mode #view-list {
+      width: 330px !important;
+      min-width: 300px !important;
+      max-width: 350px !important;
+      flex: 0 0 330px !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* 右カラム（プレイヤー）: 残りの横幅全体 (flex: 1) */
+    body.two-column-mode #view-player,
+    body.two-column-mode #view-now {
+      flex: 1 !important;
+      min-width: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      padding: 6px 16px;
+      overflow-y: auto;
+    }
+
+    body.two-column-mode .player-container {
+      width: 100%;
+      max-width: 960px;
+      height: 100%;
+      margin: 0 auto;
+      padding-bottom: 4px;
+      gap: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-evenly;
+    }
+
+    /* ジャケット画像の最大高さを 45vh に制限（縦はみ出し防止） */
+    body.two-column-mode .artwork-wrapper {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      max-height: 45vh !important;
+      max-width: min(45vh, 480px) !important;
+      margin: 0 auto 4px auto;
+      flex-shrink: 1;
+      box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
+    }
+
     /* アプリ保存ボタン (ヘッダー右上) */
     .btn-save-app {
       min-height: 32px;
@@ -1457,7 +1585,12 @@
           MokuPlay
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
-          <div class="version-badge" title="MokuPlay Version">v1.0.0</div>
+          <!-- ◫ 手動レイアウト切替ボタン (2画面 / 1画面) -->
+          <button id="btn-toggle-layout" class="wood-btn btn-layout-toggle" type="button" title="画面レイアウト切替（タップで 2画面並列 ◫ / 1画面 ▯ を強制切替）">
+            <span id="layout-toggle-icon">◫</span>
+            <span id="layout-toggle-text">2画面</span>
+          </button>
+          <div class="version-badge" title="MokuPlay Version">v1.1.0</div>
           <!-- 【有料版向け機能】完全オフライン起動用アプリ保存ボタン (開放時にコメント解除)
           <button id="btn-save-app" class="wood-btn btn-save-app" type="button" title="完全オフライン起動用として、このアプリ(HTML)自身を端末にダウンロード保存します">
             <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
@@ -1714,6 +1847,7 @@
       const STORAGE_KEY_REPEAT = 'mokuplay_repeat';
       const STORAGE_KEY_VOL = 'mokuplay_volume';
       const STORAGE_KEY_AUDIO_MODE = 'mokuplay_audio_mode'; // 'direct' または 'real'
+      const STORAGE_KEY_LAYOUT = 'mokuplay_layout_mode'; // 'two-column' または 'single'
       const SUPPORTED_EXTS = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.webm'];
 
       // iOS / iPadOS デバイスの判定
@@ -1782,6 +1916,10 @@
       const btnAudioMode = document.getElementById('btn-audio-mode');
       const audioModeIcon = document.getElementById('audio-mode-icon');
       const audioModeText = document.getElementById('audio-mode-text');
+
+      const btnToggleLayout = document.getElementById('btn-toggle-layout');
+      const layoutToggleIcon = document.getElementById('layout-toggle-icon');
+      const layoutToggleText = document.getElementById('layout-toggle-text');
 
       /* 【有料版向け機能】
       const btnSaveApp = document.getElementById('btn-save-app');
@@ -2448,9 +2586,16 @@
       }
 
       // ==========================================================================
-      // タブ切り替え
+      // タブ切り替え & レイアウト制御 (手動2画面 / 1画面)
       // ==========================================================================
       function switchTab(target) {
+        // 2画面モード（body.two-column-mode）有効時は両画面の表示を徹底維持（非表示競合を防止）
+        if (document.body.classList.contains('two-column-mode')) {
+          viewList.classList.add('active');
+          viewPlayer.classList.add('active');
+          return;
+        }
+
         if (target === 'list') {
           tabListBtn.classList.add('active');
           tabPlayerBtn.classList.remove('active');
@@ -2462,6 +2607,43 @@
           viewPlayer.classList.add('active');
           viewList.classList.remove('active');
         }
+      }
+
+      function updateLayoutUI() {
+        if (!btnToggleLayout) return;
+        const isTwoCol = document.body.classList.contains('two-column-mode');
+        btnToggleLayout.classList.toggle('active', isTwoCol);
+        if (isTwoCol) {
+          layoutToggleIcon.textContent = '▯';
+          layoutToggleText.textContent = '1画面';
+          btnToggleLayout.title = '現在【2画面表示】です。タップで【1画面表示】に戻します';
+        } else {
+          layoutToggleIcon.textContent = '◫';
+          layoutToggleText.textContent = '2画面';
+          btnToggleLayout.title = '現在【1画面表示】です。タップで【2画面表示】に強制切替します';
+        }
+      }
+
+      function toggleLayoutMode() {
+        const isCurrentlyTwo = document.body.classList.contains('two-column-mode');
+        if (!isCurrentlyTwo) {
+          document.body.classList.add('two-column-mode');
+          localStorage.setItem(STORAGE_KEY_LAYOUT, 'two-column');
+          viewList.classList.add('active');
+          viewPlayer.classList.add('active');
+          showToast('◫ 2画面表示に切り替えました');
+        } else {
+          document.body.classList.remove('two-column-mode');
+          localStorage.setItem(STORAGE_KEY_LAYOUT, 'single');
+          // 1画面時は選曲画面を単独表示
+          switchTab('list');
+          showToast('▯ 1画面表示に切り替えました');
+        }
+        updateLayoutUI();
+      }
+
+      if (btnToggleLayout) {
+        btnToggleLayout.addEventListener('click', toggleLayoutMode);
       }
 
       tabListBtn.addEventListener('click', () => switchTab('list'));
@@ -3608,9 +3790,20 @@
       ========================================================================== */
 
       // --- 起動時初期化 ---
+      const savedLayout = localStorage.getItem(STORAGE_KEY_LAYOUT);
+      if (savedLayout === 'two-column') {
+        document.body.classList.add('two-column-mode');
+        viewList.classList.add('active');
+        viewPlayer.classList.add('active');
+      }
+      updateLayoutUI();
       updateAudioModeUI();
       startVisualizer();
       checkResumeState();
+
+      window.addEventListener('resize', () => {
+        updateLayoutUI();
+      });
 
     })();
   </script>
