@@ -1,0 +1,2944 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#b58750">
+  <title>MokuPlay - 木目調オフライン音楽プレイヤー</title>
+  <style>
+    /* ==========================================================================
+       木目調デザイン & 基本リセット (完全オフライン・外部依存ゼロ)
+       ========================================================================== */
+    :root {
+      /* 木目パレット: 明るいオーク／メープル材調 */
+      --wood-base-1: #f9eedf;
+      --wood-base-2: #f2dcbf;
+      --wood-base-3: #e5c39b;
+      --wood-mid:    #caa06d;
+      --wood-dark:   #9f713e;
+      --wood-shadow: #66431e;
+      --wood-border: #b88a55;
+
+      /* アクセント & テキスト */
+      --amber-glow:  #ffaa2a;
+      --amber-dark:  #b86500;
+      --text-main:   #3d2611;
+      --text-muted:  #755535;
+      --text-light:  #947352;
+      --panel-bg:    rgba(255, 250, 243, 0.88);
+      --panel-sunken:rgba(180, 130, 75, 0.15);
+
+      /* UIパーツサイズ */
+      --min-touch: 44px;
+      --min-touch-btn: 48px;
+      --minibar-height: 68px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+      color: var(--text-main);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      overflow-x: hidden;
+      overflow-y: hidden;
+      /* 木目テクスチャのCSS合成 (完全オフライン) */
+      background-color: var(--wood-base-2);
+      background-image:
+        repeating-linear-gradient(90deg,
+          rgba(159, 113, 62, 0.05) 0px,
+          rgba(159, 113, 62, 0.05) 1px,
+          transparent 1px,
+          transparent 5px
+        ),
+        repeating-linear-gradient(90deg,
+          rgba(255, 255, 255, 0.12) 0px,
+          rgba(255, 255, 255, 0.12) 2px,
+          transparent 2px,
+          transparent 9px
+        ),
+        linear-gradient(135deg,
+          var(--wood-base-1) 0%,
+          var(--wood-base-2) 35%,
+          var(--wood-base-3) 70%,
+          var(--wood-mid) 100%
+        );
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* アプリ全体コンテナ */
+    #app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      max-width: 640px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      background: rgba(255, 248, 238, 0.35);
+      box-shadow: 0 0 30px rgba(102, 67, 30, 0.25);
+    }
+
+    /* 上部ヘッダー & タブ */
+    header {
+      background: linear-gradient(to bottom, #edd2b1, #deb789);
+      border-bottom: 2px solid var(--wood-border);
+      padding: 6px 10px 4px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 2px 4px rgba(102, 67, 30, 0.15);
+      z-index: 20;
+    }
+
+    .brand-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--wood-shadow);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .brand-title svg {
+      width: 19px;
+      height: 19px;
+      fill: var(--wood-shadow);
+    }
+
+    /* タブ切り替えボタンバー */
+    .tab-nav {
+      display: flex;
+      background: rgba(159, 113, 62, 0.22);
+      padding: 2px;
+      border-radius: 10px;
+      box-shadow: inset 0 2px 4px rgba(102, 67, 30, 0.35);
+    }
+
+    .tab-btn {
+      flex: 1;
+      height: 33px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(to bottom, #fffaf2, #f3deca);
+      color: var(--wood-shadow);
+      box-shadow: 0 2px 4px rgba(102, 67, 30, 0.22), 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    /* メインコンテンツエリア（2画面切り替え） */
+    main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: var(--minibar-height);
+    }
+
+    .screen-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      display: none;
+      flex-direction: column;
+      padding: 6px 8px 12px 8px;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .screen-view.active {
+      display: flex;
+    }
+
+    /* ==========================================================================
+       共通の木目ボタン・スライダー・パーツ
+       ========================================================================== */
+    .wood-btn {
+      min-height: var(--min-touch-btn);
+      min-width: var(--min-touch-btn);
+      padding: 8px 14px;
+      border: 1px solid var(--wood-border);
+      border-radius: 10px;
+      background: linear-gradient(to bottom, #fff6eb 0%, #ebd0b0 55%, #dfbc94 100%);
+      color: var(--wood-shadow);
+      font-size: 0.88rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 3px 5px rgba(102, 67, 30, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+      touch-action: manipulation;
+    }
+
+    .wood-btn:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: 0 1px 2px rgba(102, 67, 30, 0.3), inset 0 2px 4px rgba(102, 67, 30, 0.2);
+      background: linear-gradient(to bottom, #dfbc94 0%, #ebd0b0 100%);
+    }
+
+    .wood-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+      box-shadow: none;
+    }
+
+    .wood-btn.round {
+      border-radius: 50%;
+      padding: 0;
+    }
+
+    /* ==========================================================================
+       選曲画面 (リストビュー)
+       ========================================================================== */
+    /* ==========================================================================
+       選曲画面 (リストビュー) - 1行コンパクトツールバー & 最大化リスト
+       ========================================================================== */
+    .compact-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      width: 100%;
+      height: 42px;
+      flex-shrink: 0;
+    }
+
+    .compact-toolbar .wood-btn {
+      min-height: 40px;
+      height: 40px;
+      min-width: 40px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      border-radius: 8px;
+      flex-shrink: 0;
+      gap: 4px;
+    }
+
+    /* ホーム（トップ）長押し対応ボタン */
+    #btn-home {
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 長押しプログレス演出 */
+    .long-press-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      width: 0%;
+      background: var(--amber-glow);
+      transition: width linear;
+    }
+
+    /* パンくずリスト (ツールバー内フレックス横スクロール) */
+    .breadcrumbs-bar {
+      flex: 1;
+      min-width: 0;
+      background: var(--panel-sunken);
+      border: 1px solid rgba(159, 113, 62, 0.35);
+      border-radius: 8px;
+      padding: 0 8px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--wood-shadow);
+      box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.25);
+    }
+    .breadcrumbs-bar::-webkit-scrollbar { display: none; }
+
+    .crumb-item {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+    .crumb-item:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .crumb-separator {
+      margin: 0 3px;
+      color: var(--wood-dark);
+      opacity: 0.6;
+    }
+
+    /* 空状態ガイド */
+    .empty-state {
+      margin: auto 0;
+      text-align: center;
+      padding: 24px 16px;
+      background: var(--panel-bg);
+      border: 2px dashed var(--wood-border);
+      border-radius: 14px;
+      box-shadow: 0 3px 10px rgba(102, 67, 30, 0.1);
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      fill: var(--wood-mid);
+      margin-bottom: 8px;
+    }
+
+    .empty-state h3 {
+      font-size: 1.05rem;
+      color: var(--wood-shadow);
+      margin-bottom: 6px;
+    }
+
+    .empty-state p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 14px;
+    }
+
+    /* ファイル/フォルダリスト */
+    .file-list-container {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    .file-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .file-item {
+      min-height: 44px;
+      background: var(--panel-bg);
+      border: 1px solid rgba(184, 138, 85, 0.45);
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(102, 67, 30, 0.06);
+      transition: all 0.12s ease;
+    }
+
+    .file-item:active {
+      transform: scale(0.99);
+      background: #fdf2e3;
+    }
+
+    .file-item.is-folder {
+      border-left: 4px solid var(--wood-mid);
+    }
+
+    .file-item.is-song {
+      border-left: 4px solid #caa06d;
+    }
+
+    .file-item.playing {
+      border-left: 5px solid var(--amber-glow);
+      background: #fff5e3;
+      box-shadow: 0 2px 8px rgba(255, 170, 42, 0.35);
+    }
+
+    .file-icon {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .file-icon svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .folder-icon svg { fill: var(--wood-dark); }
+    .song-icon svg { fill: var(--wood-shadow); }
+
+    .file-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .file-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .playing-indicator {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 16px;
+      margin-left: 6px;
+    }
+
+    .playing-indicator span {
+      width: 3px;
+      background: var(--amber-glow);
+      border-radius: 1px;
+      animation: soundBars 0.8s ease-in-out infinite alternate;
+    }
+    .playing-indicator span:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+    .playing-indicator span:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+    .playing-indicator span:nth-child(3) { height: 40%; animation-delay: 0.2s; }
+
+    @keyframes soundBars {
+      0% { height: 20%; }
+      100% { height: 100%; }
+    }
+
+    /* ==========================================================================
+       再生中画面 (プレイヤービュー)
+       ========================================================================== */
+    .player-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: min-content;
+      padding-bottom: 8px;
+    }
+
+    /* ジャケット表示エリア (画面横幅95% ド迫力表示) */
+    .artwork-wrapper {
+      position: relative;
+      width: 95%;
+      max-width: 95vw;
+      aspect-ratio: 1 / 1;
+      margin: 4px auto 6px auto;
+      border-radius: 16px;
+      padding: 0;
+      background: #190f07;
+      box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
+      border: 2px solid var(--wood-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    /* 抽出された埋め込みジャケット画像 */
+    #artwork-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      border-radius: 14px;
+    }
+
+    /* レコード盤デザイン */
+    .vinyl-disc {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, #291b10 0%, #150d08 40%, #291b10 42%, #180e08 65%, #291b10 67%, #120a05 100%);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.8);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .vinyl-disc.spinning {
+      animation: spinVinyl 16s linear infinite;
+    }
+
+    .vinyl-disc.paused {
+      animation-play-state: paused;
+    }
+
+    @keyframes spinVinyl {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* レコード中心ラベル（ウッド調） */
+    .vinyl-label {
+      width: 38%;
+      height: 38%;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffeed7, #d79f64);
+      border: 3px solid #66431e;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .vinyl-label::after {
+      content: "";
+      width: 14px;
+      height: 14px;
+      background: #180e08;
+      border-radius: 50%;
+      border: 2px solid #ecd3b4;
+    }
+
+    /* ジャケットのタップゾーン（左右分割） */
+    .artwork-touch-zone {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 50%;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .artwork-touch-left {
+      left: 0;
+      justify-content: flex-start;
+      padding-left: 14px;
+      border-top-left-radius: 18px;
+      border-bottom-left-radius: 18px;
+    }
+
+    .artwork-touch-right {
+      right: 0;
+      justify-content: flex-end;
+      padding-right: 14px;
+      border-top-right-radius: 18px;
+      border-bottom-right-radius: 18px;
+    }
+
+    .artwork-touch-zone svg {
+      width: 36px;
+      height: 36px;
+      fill: #ffffff;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+    }
+
+    .artwork-wrapper:hover .artwork-touch-zone,
+    .artwork-touch-zone:active {
+      opacity: 0.9;
+    }
+
+    /* 曲情報表示 */
+    .player-track-info {
+      width: 100%;
+      text-align: center;
+      padding: 0 8px;
+    }
+
+    .player-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--wood-shadow);
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .player-folder {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* スペクトラムアナライザー (Canvas) */
+    .visualizer-box {
+      width: 100%;
+      max-width: 380px;
+      height: 48px;
+      background: rgba(45, 28, 14, 0.9);
+      border-radius: 8px;
+      border: 1px solid var(--wood-border);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #visualizer-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 再生シークバー部 */
+    .progress-section {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--wood-shadow);
+      padding: 0 4px;
+    }
+
+    /* 木製スライダースタイル (シークバー & 音量) */
+    .wood-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--panel-sunken);
+      box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.4);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .wood-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fff7ed, #dfbc94);
+      border: 2px solid var(--wood-dark);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .wood-slider::-webkit-slider-thumb:active {
+      transform: scale(1.2);
+    }
+
+    .wood-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fff7ed, #dfbc94);
+      border: 2px solid var(--wood-dark);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+
+    /* コントロールボタン群 */
+    .control-buttons-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      max-width: 440px;
+      margin: 4px 0;
+    }
+
+    .btn-main-play {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(to bottom, #fffbf5 0%, #e6caa6 50%, #cca06d 100%);
+      box-shadow: 0 4px 8px rgba(102, 67, 30, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.9);
+      border: 2px solid var(--wood-dark);
+      flex-shrink: 0;
+    }
+
+    .btn-main-play svg {
+      width: 26px;
+      height: 26px;
+      fill: var(--wood-shadow);
+      margin-left: 2px; /* 再生アイコン微調整 */
+    }
+
+    .btn-main-play.is-playing svg {
+      margin-left: 0;
+    }
+
+    .btn-sub-ctrl {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      padding: 0;
+    }
+
+    .btn-sub-ctrl svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--wood-shadow);
+    }
+
+    .toggle-active {
+      background: linear-gradient(to bottom, #ffeccf, #ffc885);
+      border-color: var(--amber-dark);
+      color: var(--amber-dark);
+      box-shadow: inset 0 2px 4px rgba(184, 101, 0, 0.3);
+    }
+    .toggle-active svg {
+      fill: var(--amber-dark);
+    }
+
+    /* ボリュームバー */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .volume-row svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--wood-dark);
+      flex-shrink: 0;
+    }
+
+    /* ==========================================================================
+       最下部常駐：再生中ミニバー (ミニプレイヤー)
+       ========================================================================== */
+    #minibar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 640px;
+      height: var(--minibar-height);
+      background: linear-gradient(to bottom, #f7e6ce, #e2be94);
+      border-top: 2px solid var(--wood-border);
+      box-shadow: 0 -3px 10px rgba(102, 67, 30, 0.22);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 12px;
+      z-index: 100;
+      cursor: pointer;
+    }
+
+    .minibar-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: #2b1d12;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--wood-dark);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    #minibar-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .minibar-thumb svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffeed7;
+    }
+
+    .minibar-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .minibar-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--wood-shadow);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .minibar-sub {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .minibar-action {
+      flex-shrink: 0;
+    }
+
+    /* ミニバーの再生・再開ボタン（最低48px） */
+    .minibar-play-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .minibar-play-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--wood-shadow);
+    }
+
+    /* レジューム用復帰ボタン（label要素） */
+    .resume-label-btn {
+      background: linear-gradient(to bottom, #fff5e8, #f0cf9e);
+      border: 1.5px solid var(--amber-dark);
+      color: var(--wood-shadow);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(102, 67, 30, 0.25);
+      animation: pulseAttention 2s infinite;
+      white-space: nowrap;
+    }
+
+    .resume-label-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--amber-dark);
+    }
+
+    @keyframes pulseAttention {
+      0%, 100% { box-shadow: 0 2px 4px rgba(102, 67, 30, 0.25); }
+      50% { box-shadow: 0 2px 10px rgba(255, 170, 42, 0.6); }
+    }
+
+    /* トースト通知 */
+    #toast-msg {
+      position: fixed;
+      bottom: calc(var(--minibar-height) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(45, 27, 13, 0.92);
+      color: #fffaf4;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      z-index: 1000;
+      white-space: nowrap;
+      border: 1px solid var(--wood-mid);
+    }
+
+    #toast-msg.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* 非表示のファイルインプット */
+    .hidden-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    /* ==========================================================================
+       PC / ワイド画面（16:9等、横幅860px以上）向け 2画面並列レイアウト
+       ========================================================================== */
+    @media (min-width: 860px) {
+      body {
+        padding: 10px;
+        overflow-y: hidden;
+      }
+
+      #app-container {
+        max-width: 1800px;
+        width: 100%;
+        height: calc(100vh - 20px);
+        height: calc(100dvh - 20px);
+        border-radius: 16px;
+        border: 2px solid var(--wood-border);
+        box-shadow: 0 10px 30px rgba(80, 50, 20, 0.35);
+      }
+
+      /* ワイド画面では両画面を常時並列表示するためタブセレクタは非表示 */
+      .tab-nav {
+        display: none;
+      }
+
+      main {
+        display: flex;
+        flex-direction: row;
+        gap: 16px;
+        padding: 10px 16px 10px 16px;
+        overflow: hidden;
+        margin-bottom: 0;
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* 選曲画面と再生中画面を左右2列で同時に並列表示 */
+      .screen-view {
+        position: relative;
+        display: flex !important;
+        height: 100%;
+        border-radius: 12px;
+        border: 1.5px solid rgba(184, 138, 85, 0.45);
+        background: rgba(255, 250, 243, 0.7);
+        box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.12);
+        padding: 10px 14px;
+        overflow-y: auto;
+      }
+
+      /* 1. 左カラム（選曲リスト）: 幅を360pxに固定（ウィンドウが広がっても不必要に広がらない） */
+      #view-list {
+        width: 360px;
+        min-width: 340px;
+        max-width: 400px;
+        flex: 0 0 360px;
+        flex-shrink: 0;
+      }
+
+      /* 2. 右カラム（再生中プレイヤー）: 横の余ったスペースをすべて使って大きく広がる */
+      #view-player {
+        flex: 1;
+        min-width: 0;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 20px;
+      }
+
+      .player-container {
+        width: 100%;
+        max-width: 960px;
+        height: 100%;
+        margin: 0 auto;
+        padding-bottom: 6px;
+        gap: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-evenly;
+      }
+
+      /* 3. ジャケット画像: 縦横比1:1維持、画面高さ52vhに合わせてド迫力に拡大（縦はみ出し防止） */
+      .artwork-wrapper {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
+        max-height: 52vh;
+        max-width: min(52vh, 600px);
+        margin: 0 auto 6px auto;
+        flex-shrink: 1;
+        box-shadow: 0 10px 28px rgba(60, 36, 12, 0.45), inset 0 0 0 2px var(--wood-border);
+      }
+
+      #artwork-img {
+        object-fit: contain;
+      }
+
+      .artwork-touch-zone svg {
+        width: 44px;
+        height: 44px;
+      }
+
+      /* 曲情報表示のワイド化 */
+      .player-track-info {
+        width: 100%;
+        max-width: min(840px, 96%);
+      }
+
+      .player-title {
+        font-size: 1.35rem;
+        margin-bottom: 4px;
+      }
+
+      .player-folder {
+        font-size: 0.95rem;
+      }
+
+      /* スペアナ（Canvas）のワイド化 */
+      .visualizer-box {
+        width: 100%;
+        max-width: min(840px, 96%);
+        height: 54px;
+      }
+
+      /* シークバーのワイド化 */
+      .progress-section {
+        width: 100%;
+        max-width: min(840px, 96%);
+        gap: 6px;
+      }
+
+      .time-labels {
+        font-size: 0.85rem;
+      }
+
+      /* コントロールボタン群のワイド配置 */
+      .control-buttons-row {
+        width: 100%;
+        max-width: min(640px, 90%);
+        gap: 14px;
+        margin: 4px 0;
+      }
+
+      .btn-main-play {
+        width: 64px;
+        height: 64px;
+      }
+
+      .btn-main-play svg {
+        width: 30px;
+        height: 30px;
+      }
+
+      .btn-sub-ctrl {
+        width: 46px;
+        height: 46px;
+      }
+
+      .btn-sub-ctrl svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      /* 音量スライダーのワイド化 */
+      .volume-row {
+        width: 100%;
+        max-width: min(440px, 75%);
+        gap: 12px;
+      }
+
+      /* ミニバーをアプリ下部に自然に配置 */
+      #minibar {
+        position: relative;
+        left: auto;
+        bottom: auto;
+        transform: none;
+        width: 100%;
+        max-width: 100%;
+        margin-top: auto;
+        flex-shrink: 0;
+        border-bottom-left-radius: 14px;
+        border-bottom-right-radius: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- ヘッダー & タブナビゲーション -->
+    <header>
+      <div class="brand-bar">
+        <div class="brand-title">
+          <!-- ウッドアコースティック風 音符アイコン -->
+          <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          MokuPlay
+        </div>
+        <div style="font-size: 0.74rem; font-weight: bold; color: var(--wood-dark); background: rgba(255,255,255,0.4); padding: 3px 8px; border-radius: 6px;">
+          Offline / 木目調
+        </div>
+      </div>
+
+      <!-- タブバー -->
+      <nav class="tab-nav">
+        <button id="tab-list-btn" class="tab-btn active" type="button">
+          <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+          選曲 (フォルダ)
+        </button>
+        <button id="tab-player-btn" class="tab-btn" type="button">
+          <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          再生中
+        </button>
+      </nav>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main>
+      <!-- ================= 画面A: 選曲画面 (リストビュー) ================= -->
+      <section id="view-list" class="screen-view active">
+        <!-- 1行コンパクトツールバー -->
+        <div class="compact-toolbar">
+          <!-- 🏠 トップボタン（タップ: ルート / 長押し: フォルダ変更） -->
+          <button id="btn-home" class="wood-btn" type="button" title="タップ: ルートへ / 長押し: フォルダ変更">
+            <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            <div id="home-long-press-bar" class="long-press-progress"></div>
+          </button>
+
+          <!-- ⬆ 1階層上へボタン -->
+          <button id="btn-up" class="wood-btn" type="button" disabled title="1階層上へ">
+            <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+          </button>
+
+          <!-- パンくずリスト (ツールバー内横スクロール) -->
+          <div id="breadcrumbs" class="breadcrumbs-bar">
+            <span class="crumb-item" data-path="">🏠 /</span>
+          </div>
+
+          <!-- フォルダ追加/変更ボタン (明示的タップ用) -->
+          <label for="folder-picker-input" class="wood-btn" style="cursor: pointer;" title="音楽フォルダを選択">
+            <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+          </label>
+        </div>
+
+        <!-- ファイル／フォルダ一覧 (画面残り全領域) -->
+        <div class="file-list-container">
+          <div id="empty-state" class="empty-state">
+            <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12 9l-4 4h3v4h2v-4h3l-4-4z"/></svg>
+            <h3>音楽フォルダが選択されていません</h3>
+            <p>スマホやPC内の音楽ファイルが入ったフォルダを選択してください。<br>（オフライン・機内モードでもそのまま再生できます）</p>
+            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <label for="folder-picker-input" class="wood-btn" style="padding: 10px 16px;">
+                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                フォルダを選択
+              </label>
+              <label for="files-picker-input" class="wood-btn" style="padding: 10px 14px; opacity: 0.9;" title="フォルダ選択が効かない端末向け">
+                <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                ファイルで選択
+              </label>
+            </div>
+          </div>
+
+          <ul id="file-list" class="file-list" style="display: none;">
+            <!-- JavaScriptで動的生成 -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= 画面B: 再生中画面 (プレイヤービュー) ================= -->
+      <section id="view-player" class="screen-view">
+        <div class="player-container">
+          
+          <!-- 曲情報 -->
+          <div class="player-track-info">
+            <div id="player-title" class="player-title">曲が選択されていません</div>
+            <div id="player-folder" class="player-folder">フォルダ: -</div>
+          </div>
+
+          <!-- ジャケット表示エリア (画面横幅95% ド迫力表示 + 左右タップスキップ) -->
+          <div id="artwork-area" class="artwork-wrapper" title="左側タップ: 前の曲 / 右側タップ: 次の曲">
+            <!-- 抽出された埋め込みジャケット画像 -->
+            <img id="artwork-img" alt="Album Artwork">
+
+            <!-- レコード盤プレースホルダー (埋め込み画像がない場合に表示) -->
+            <div id="vinyl-disc" class="vinyl-disc">
+              <div class="vinyl-label"></div>
+            </div>
+
+            <!-- 左側スキップ領域 -->
+            <div class="artwork-touch-zone artwork-touch-left" id="touch-prev" title="前の曲へ">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </div>
+
+            <!-- 右側スキップ領域 -->
+            <div class="artwork-touch-zone artwork-touch-right" id="touch-next" title="次の曲へ">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </div>
+          </div>
+
+          <!-- スペクトラムアナライザー -->
+          <div class="visualizer-box">
+            <canvas id="visualizer-canvas" width="360" height="48"></canvas>
+          </div>
+
+          <!-- シークバー & 時間 -->
+          <div class="progress-section">
+            <input id="seek-slider" class="wood-slider" type="range" min="0" max="100" value="0" step="0.1">
+            <div class="time-labels">
+              <span id="current-time">00:00</span>
+              <span id="total-time">00:00</span>
+            </div>
+          </div>
+
+          <!-- コントロール部 -->
+          <div class="control-buttons-row">
+            <!-- シャッフル -->
+            <button id="btn-shuffle" class="wood-btn btn-sub-ctrl" type="button" title="シャッフル切替">
+              <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </button>
+
+            <!-- 前の曲 -->
+            <button id="btn-prev" class="wood-btn btn-sub-ctrl" type="button" title="前の曲">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+
+            <!-- 再生/一時停止 (メインボタン) -->
+            <button id="btn-play-pause" class="wood-btn btn-main-play" type="button" title="再生 / 一時停止">
+              <svg id="main-play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+
+            <!-- 停止 -->
+            <button id="btn-stop" class="wood-btn btn-sub-ctrl" type="button" title="停止">
+              <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+            </button>
+
+            <!-- 次の曲 -->
+            <button id="btn-next" class="wood-btn btn-sub-ctrl" type="button" title="次の曲">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+
+            <!-- リピート（初期有効: フォルダ内ループ） -->
+            <button id="btn-repeat" class="wood-btn btn-sub-ctrl toggle-active" type="button" title="リピート切替（同フォルダ内ループ / 終了時停止）">
+              <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+            </button>
+          </div>
+
+          <!-- 音量スライダー -->
+          <div class="volume-row">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            <input id="volume-slider" class="wood-slider" type="range" min="0" max="1" step="0.01" value="0.8">
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= 最下部常駐：再生中ミニバー ================= -->
+    <div id="minibar">
+      <!-- 左: ジャケットサムネイル (埋め込み画像 or 代替アイコン) -->
+      <div id="minibar-thumb" class="minibar-thumb">
+        <img id="minibar-thumb-img" alt="Thumbnail">
+        <svg id="minibar-thumb-svg" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      </div>
+
+      <!-- 中央: 曲名 & フォルダ名 (タップでプレイヤービューへ) -->
+      <div id="minibar-text-area" class="minibar-info">
+        <div id="minibar-title" class="minibar-title">未再生</div>
+        <div id="minibar-sub" class="minibar-sub">タップしてプレイヤーを開く</div>
+      </div>
+
+      <!-- 右: アクション（再生/一時停止 または レジュームロードボタン） -->
+      <div id="minibar-action-area" class="minibar-action">
+        <button id="minibar-play-btn" class="wood-btn minibar-play-btn" type="button" title="再生/一時停止">
+          <svg id="minibar-play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast-msg"></div>
+
+    <!-- 非表示ファイルインプット (フォルダ選択 & レジューム用) -->
+    <input type="file" id="folder-picker-input" class="hidden-input" webkitdirectory directory multiple>
+    <input type="file" id="resume-picker-input" class="hidden-input" webkitdirectory directory multiple>
+    <!-- 単曲・複数ファイル選択用フォールバック (フォルダ選択に対応していないブラウザ向け) -->
+    <input type="file" id="files-picker-input" class="hidden-input" multiple accept="audio/*,.mp3,.m4a,.flac,.wav,.ogg,.aac">
+
+    <!-- HTML5 Audio -->
+    <audio id="audio-player" preload="metadata"></audio>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       MokuPlay - 単一ファイル・完全オフライン音楽プレイヤー
+       ========================================================================== */
+    (function() {
+      'use strict';
+
+      // --- 定数 & 設定 ---
+      const STORAGE_KEY_FILE = 'mokuplay_last_file';
+      const STORAGE_KEY_TIME = 'mokuplay_last_time';
+      const STORAGE_KEY_FOLDER = 'mokuplay_last_folder';
+      const STORAGE_KEY_SHUFFLE = 'mokuplay_shuffle';
+      const STORAGE_KEY_REPEAT = 'mokuplay_repeat';
+      const STORAGE_KEY_VOL = 'mokuplay_volume';
+      const SUPPORTED_EXTS = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.webm'];
+
+      // --- DOM要素キャッシュ ---
+      const audio = document.getElementById('audio-player');
+      const tabListBtn = document.getElementById('tab-list-btn');
+      const tabPlayerBtn = document.getElementById('tab-player-btn');
+      const viewList = document.getElementById('view-list');
+      const viewPlayer = document.getElementById('view-player');
+
+      const btnHome = document.getElementById('btn-home');
+      const homeLongPressBar = document.getElementById('home-long-press-bar');
+      const btnUp = document.getElementById('btn-up');
+      const breadcrumbsEl = document.getElementById('breadcrumbs');
+      const emptyStateEl = document.getElementById('empty-state');
+      const fileListEl = document.getElementById('file-list');
+
+      const folderPickerInput = document.getElementById('folder-picker-input');
+      const resumePickerInput = document.getElementById('resume-picker-input');
+      const filesPickerInput = document.getElementById('files-picker-input');
+
+      const minibar = document.getElementById('minibar');
+      const minibarTextArea = document.getElementById('minibar-text-area');
+      const minibarTitle = document.getElementById('minibar-title');
+      const minibarSub = document.getElementById('minibar-sub');
+      const minibarThumbImg = document.getElementById('minibar-thumb-img');
+      const minibarThumbSvg = document.getElementById('minibar-thumb-svg');
+      const minibarActionArea = document.getElementById('minibar-action-area');
+      const minibarPlayBtn = document.getElementById('minibar-play-btn');
+      const minibarPlayIcon = document.getElementById('minibar-play-icon');
+
+      const playerTitle = document.getElementById('player-title');
+      const playerFolder = document.getElementById('player-folder');
+      const artworkArea = document.getElementById('artwork-area');
+      const artworkImg = document.getElementById('artwork-img');
+      const vinylDisc = document.getElementById('vinyl-disc');
+      const touchPrev = document.getElementById('touch-prev');
+      const touchNext = document.getElementById('touch-next');
+
+      const seekSlider = document.getElementById('seek-slider');
+      const currentTimeEl = document.getElementById('current-time');
+      const totalTimeEl = document.getElementById('total-time');
+
+      const btnShuffle = document.getElementById('btn-shuffle');
+      const btnPrev = document.getElementById('btn-prev');
+      const btnPlayPause = document.getElementById('btn-play-pause');
+      const mainPlayIcon = document.getElementById('main-play-icon');
+      const btnStop = document.getElementById('btn-stop');
+      const btnNext = document.getElementById('btn-next');
+      const btnRepeat = document.getElementById('btn-repeat');
+      const volumeSlider = document.getElementById('volume-slider');
+
+      const toastEl = document.getElementById('toast-msg');
+      const visualizerCanvas = document.getElementById('visualizer-canvas');
+      const canvasCtx = visualizerCanvas.getContext('2d');
+
+      // --- アプリ状態 ---
+      // 仮想ファイルシステム: Map<relativePath, { name, path, isDir, fileObj, parentPath }>
+      let fileTree = new Map();
+      let currentPath = ''; // 空文字はルート
+      let playlist = [];    // 現在の再生キュー (ファイルオブジェクト配列)
+      let currentTrackIndex = -1;
+      let isShuffle = localStorage.getItem(STORAGE_KEY_SHUFFLE) === 'true';
+      let isRepeat = localStorage.getItem(STORAGE_KEY_REPEAT) !== 'false'; // 初期状態は有効 (true)
+      let currentArtworkUrl = null; // メモリ管理用URLキャッシュ
+
+      // Web Audio API
+      let audioCtx = null;
+      let analyser = null;
+      let sourceNode = null;
+      let visualizerRunning = false;
+
+      // シークバー操作中フラグ
+      let isSeeking = false;
+
+      // ==========================================================================
+      // ユーティリティ
+      // ==========================================================================
+      function showToast(msg, duration = 3000) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        setTimeout(() => {
+          toastEl.classList.remove('show');
+        }, duration);
+      }
+
+      function formatTime(seconds) {
+        if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+
+      function isAudioFile(name) {
+        const lower = name.toLowerCase();
+        return SUPPORTED_EXTS.some(ext => lower.endsWith(ext));
+      }
+
+      function cleanTrackName(filename) {
+        // 拡張子を除去
+        return filename.replace(/\.[^/.]+$/, '');
+      }
+
+      // テキストデコード（BOM / UTF-16 / UTF-8 / Latin1 自動判別）
+      function decodeText(bytes, encoding) {
+        if (!bytes || bytes.length === 0) return '';
+        try {
+          if (encoding === 1) { // UTF-16 with BOM
+            return new TextDecoder('utf-16').decode(bytes).replace(/\0+$/, '').trim();
+          } else if (encoding === 2) { // UTF-16BE
+            return new TextDecoder('utf-16be').decode(bytes).replace(/\0+$/, '').trim();
+          } else if (encoding === 3) { // UTF-8
+            return new TextDecoder('utf-8').decode(bytes).replace(/\0+$/, '').trim();
+          } else { // 0: ISO-8859-1 or try UTF-8 fallback
+            try {
+              return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\0+$/, '').trim();
+            } catch {
+              return new TextDecoder('iso-8859-1').decode(bytes).replace(/\0+$/, '').trim();
+            }
+          }
+        } catch {
+          return '';
+        }
+      }
+
+      // ==========================================================================
+      // トラック番号・曲名ユーティリティ & ソート比較関数
+      // ==========================================================================
+
+      // トラック番号解析（"001" -> 1, "01/12" -> 1 等、左側のゼロを除去して正の整数値にする）
+      function parseTrackNumber(val) {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'number') {
+          return (!isNaN(val) && val > 0) ? Math.floor(val) : null;
+        }
+        const str = String(val).trim();
+        if (!str) return null;
+        const firstPart = str.split('/')[0].trim();
+        const match = firstPart.match(/^0*(\d+)/);
+        if (match && match[1]) {
+          const n = parseInt(match[1], 10);
+          return (n > 0 && n < 10000) ? n : null;
+        }
+        return null;
+      }
+
+      // ファイル名からトラック番号を抽出（例: "001. Song.mp3", "01 - Song.flac", "[03] Song.m4a", "001.mp3"）
+      function parseTrackNumberFromFilename(filename) {
+        if (!filename) return null;
+        const clean = cleanTrackName(filename);
+        // 先頭の [01], (01), 001., 01 -, 01_ などのパターン
+        const match = clean.match(/^[\(\[]?0*(\d{1,4})[\)\]\.\s_\-]+/);
+        if (match && match[1]) {
+          const n = parseInt(match[1], 10);
+          if (n > 0 && n < 10000) return n;
+        }
+        // "Track 01" 形式
+        const trackWordMatch = clean.match(/^track[\s_\-]*0*(\d{1,4})/i);
+        if (trackWordMatch && trackWordMatch[1]) {
+          const n = parseInt(trackWordMatch[1], 10);
+          if (n > 0 && n < 10000) return n;
+        }
+        // ファイル名自体が数値のみ（例: "001.mp3", "03.flac"）
+        const pureNumMatch = clean.match(/^0*(\d+)$/);
+        if (pureNumMatch && pureNumMatch[1]) {
+          const n = parseInt(pureNumMatch[1], 10);
+          if (n > 0 && n < 10000) return n;
+        }
+        return null;
+      }
+
+      // トラック番号を冠した表示用タイトルの生成（ゼロ埋め除去）
+      function formatTrackDisplayTitle(track) {
+        if (!track) return '';
+        let title = track.title || cleanTrackName(track.name);
+        if (track.trackNo != null && !isNaN(track.trackNo)) {
+          const num = track.trackNo;
+          // タイトル文字列の先頭にすでにトラック番号（0埋め含む）＋記号がある場合は重複を防ぐため除去
+          const prefixRegex = new RegExp(`^[\\(\\[]?0*${num}[\\)\\]\\.\\s_\\-]*\\s*`, 'i');
+          if (prefixRegex.test(title)) {
+            const stripped = title.replace(prefixRegex, '').trim();
+            if (!stripped) {
+              return String(num);
+            }
+            title = stripped;
+          }
+          return `${num}. ${title}`;
+        }
+        return title;
+      }
+
+      // 曲のソート比較関数
+      // 優先度 1: トラックNo昇順（左側のゼロを除去した整数値）
+      // 優先度 2: ファイル名昇順（自然順ソート）
+      function compareTracks(a, b) {
+        const aHas = (a.trackNo != null && !isNaN(a.trackNo));
+        const bHas = (b.trackNo != null && !isNaN(b.trackNo));
+
+        if (aHas && bHas) {
+          if (a.trackNo !== b.trackNo) {
+            return a.trackNo - b.trackNo;
+          }
+        } else if (aHas && !bHas) {
+          return -1; // a を優先
+        } else if (!aHas && bHas) {
+          return 1;  // b を優先
+        }
+
+        // 優先度 2: ファイル名昇順
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+
+      // ==========================================================================
+      // 埋め込みテキストメタデータ（トラック名・アーティスト名・トラックNo）解析パーサー
+      // ==========================================================================
+      async function extractTrackMetadata(file) {
+        if (!file) return { title: null, artist: null, trackNo: null };
+        try {
+          const lowerName = file.name.toLowerCase();
+          let res = { title: null, artist: null, trackNo: null };
+          if (lowerName.endsWith('.mp3')) {
+            res = await parseId3v2TextTags(file);
+          } else if (lowerName.endsWith('.flac')) {
+            res = await parseFlacTextTags(file);
+          } else if (lowerName.endsWith('.m4a') || lowerName.endsWith('.mp4') || lowerName.endsWith('.aac')) {
+            res = await parseMp4TextTags(file);
+          } else {
+            res = await parseId3v2TextTags(file);
+            if (!res.title && !res.artist && !res.trackNo) res = await parseMp4TextTags(file);
+          }
+          // タグからトラックNoが取得できなかった場合はファイル名からフォールバック
+          if (res.trackNo == null) {
+            res.trackNo = parseTrackNumberFromFilename(file.name);
+          }
+          return res;
+        } catch (err) {
+          console.warn('テキストタグ抽出エラー:', err);
+          return { title: null, artist: null, trackNo: parseTrackNumberFromFilename(file.name) };
+        }
+      }
+
+      // MP3 (ID3v2.2 / ID3v2.3 / ID3v2.4) の TIT2/TT2, TPE1/TP1, TRCK/TRK 解析
+      async function parseId3v2TextTags(file) {
+        const headerBuf = await file.slice(0, 10).arrayBuffer();
+        if (headerBuf.byteLength < 10) return { title: null, artist: null, trackNo: null };
+        const h = new Uint8Array(headerBuf);
+        if (h[0] !== 0x49 || h[1] !== 0x44 || h[2] !== 0x33) return { title: null, artist: null, trackNo: null };
+
+        const version = h[3];
+        const tagSize = ((h[6] & 0x7f) << 21) | ((h[7] & 0x7f) << 14) | ((h[8] & 0x7f) << 7) | (h[9] & 0x7f);
+        const readSize = Math.min(tagSize + 10, 256 * 1024, file.size);
+        const tagBuf = await file.slice(0, readSize).arrayBuffer();
+        const data = new Uint8Array(tagBuf);
+        const limit = Math.min(data.length, tagSize + 10);
+
+        let offset = 10;
+        let title = null;
+        let artist = null;
+        let trackNo = null;
+
+        if (version === 2) { // ID3v2.2
+          while (offset + 6 < limit && (!title || !artist || !trackNo)) {
+            const frameId = String.fromCharCode(data[offset], data[offset + 1], data[offset + 2]);
+            const frameSize = (data[offset + 3] << 16) | (data[offset + 4] << 8) | data[offset + 5];
+            offset += 6;
+            if (frameSize <= 0 || offset + frameSize > limit) break;
+
+            if (frameId === 'TT2' && !title) {
+              title = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+            } else if (frameId === 'TP1' && !artist) {
+              artist = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+            } else if (frameId === 'TRK' && !trackNo) {
+              const trkStr = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+              trackNo = parseTrackNumber(trkStr);
+            }
+            offset += frameSize;
+          }
+        } else if (version === 3 || version === 4) { // ID3v2.3 / ID3v2.4
+          while (offset + 10 < limit && (!title || !artist || !trackNo)) {
+            const frameId = String.fromCharCode(data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
+            let frameSize;
+            if (version === 4) {
+              frameSize = ((data[offset + 4] & 0x7f) << 21) | ((data[offset + 5] & 0x7f) << 14) | ((data[offset + 6] & 0x7f) << 7) | (data[offset + 7] & 0x7f);
+            } else {
+              frameSize = (data[offset + 4] << 24) | (data[offset + 5] << 16) | (data[offset + 6] << 8) | data[offset + 7];
+            }
+            offset += 10;
+            if (frameSize <= 0 || offset + frameSize > limit) break;
+
+            if (frameId === 'TIT2' && !title) {
+              title = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+            } else if (frameId === 'TPE1' && !artist) {
+              artist = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+            } else if (frameId === 'TRCK' && !trackNo) {
+              const trkStr = decodeText(data.subarray(offset + 1, offset + frameSize), data[offset]);
+              trackNo = parseTrackNumber(trkStr);
+            }
+            offset += frameSize;
+          }
+        }
+        return { title, artist, trackNo };
+      }
+
+      // FLAC VORBIS_COMMENT (Block Type 4) 解析
+      async function parseFlacTextTags(file) {
+        const readSize = Math.min(256 * 1024, file.size);
+        const buf = await file.slice(0, readSize).arrayBuffer();
+        if (buf.byteLength < 4) return { title: null, artist: null, trackNo: null };
+        const data = new Uint8Array(buf);
+        if (data[0] !== 0x66 || data[1] !== 0x4C || data[2] !== 0x61 || data[3] !== 0x43) return { title: null, artist: null, trackNo: null };
+
+        let offset = 4;
+        let isLast = false;
+        let title = null;
+        let artist = null;
+        let trackNo = null;
+
+        while (offset + 4 < data.length && !isLast && (!title || !artist || !trackNo)) {
+          const headerByte = data[offset];
+          isLast = (headerByte & 0x80) !== 0;
+          const blockType = headerByte & 0x7F;
+          const blockSize = (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+          offset += 4;
+
+          if (blockType === 4) { // METADATA_BLOCK_VORBIS_COMMENT
+            let blockData = data;
+            let blockOffset = offset;
+            if (offset + blockSize > data.length) {
+              const fullBlockBuf = await file.slice(offset, offset + blockSize).arrayBuffer();
+              blockData = new Uint8Array(fullBlockBuf);
+              blockOffset = 0;
+            }
+            const view = new DataView(blockData.buffer, blockData.byteOffset, blockData.byteLength);
+            let pos = blockOffset;
+            const vendorLen = view.getUint32(pos, true);
+            pos += 4 + vendorLen;
+            const commentCount = view.getUint32(pos, true);
+            pos += 4;
+
+            for (let i = 0; i < commentCount && pos < blockOffset + blockSize; i++) {
+              const len = view.getUint32(pos, true);
+              pos += 4;
+              if (pos + len <= blockData.length) {
+                const commentStr = new TextDecoder('utf-8').decode(blockData.subarray(pos, pos + len));
+                const eqIdx = commentStr.indexOf('=');
+                if (eqIdx !== -1) {
+                  const key = commentStr.substring(0, eqIdx).toUpperCase();
+                  const val = commentStr.substring(eqIdx + 1).trim();
+                  if (key === 'TITLE' && !title) title = val;
+                  if (key === 'ARTIST' && !artist) artist = val;
+                  if ((key === 'TRACKNUMBER' || key === 'TRACK') && !trackNo) {
+                    trackNo = parseTrackNumber(val);
+                  }
+                }
+              }
+              pos += len;
+            }
+          }
+          offset += blockSize;
+        }
+        return { title, artist, trackNo };
+      }
+
+      // MP4 / M4A ©nam, ©ART, trkn 解析
+      async function parseMp4TextTags(file) {
+        const readSize = Math.min(512 * 1024, file.size);
+        let buf = await file.slice(0, readSize).arrayBuffer();
+        let res = scanMp4ForText(new Uint8Array(buf));
+        if (res.title || res.artist || res.trackNo) return res;
+
+        if (file.size > readSize) {
+          const tailSize = Math.min(512 * 1024, file.size);
+          const tailBuf = await file.slice(file.size - tailSize, file.size).arrayBuffer();
+          res = scanMp4ForText(new Uint8Array(tailBuf));
+        }
+        return res;
+      }
+
+      function scanMp4ForText(data) {
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        const len = data.length;
+        let title = null;
+        let artist = null;
+        let trackNo = null;
+
+        for (let i = 0; i < len - 8 && (!title || !artist || !trackNo); i++) {
+          const isTitle = (data[i] === 0xA9 && data[i + 1] === 0x6E && data[i + 2] === 0x61 && data[i + 3] === 0x6D);
+          const isArtist = (data[i] === 0xA9 && data[i + 1] === 0x41 && data[i + 2] === 0x52 && data[i + 3] === 0x54);
+          const isTrkn = (data[i] === 0x74 && data[i + 1] === 0x72 && data[i + 2] === 0x6B && data[i + 3] === 0x6E);
+
+          if (isTitle || isArtist || isTrkn) {
+            let atomSize = (i >= 4) ? view.getUint32(i - 4, false) : 0;
+            if (atomSize <= 8 || atomSize > 64 * 1024) atomSize = 4096;
+            const atomEnd = Math.min(len, i + atomSize);
+
+            for (let j = i + 4; j < atomEnd - 16; j++) {
+              if (data[j] === 0x64 && data[j + 1] === 0x61 && data[j + 2] === 0x74 && data[j + 3] === 0x61) {
+                const dataSize = (j >= 4) ? view.getUint32(j - 4, false) : 0;
+                const payloadStart = j + 12;
+                const payloadEnd = (dataSize > 16 && j - 4 + dataSize <= len) ? (j - 4 + dataSize) : atomEnd;
+                if (payloadStart < payloadEnd) {
+                  if (isTrkn && !trackNo) {
+                    if (payloadEnd - payloadStart >= 4) {
+                      const trkVal = view.getUint16(payloadStart + 2, false);
+                      if (trkVal > 0 && trkVal < 10000) {
+                        trackNo = trkVal;
+                      }
+                    }
+                    if (!trackNo) {
+                      const str = new TextDecoder('utf-8').decode(data.subarray(payloadStart, payloadEnd)).trim();
+                      trackNo = parseTrackNumber(str);
+                    }
+                  } else {
+                    const str = new TextDecoder('utf-8').decode(data.subarray(payloadStart, payloadEnd)).replace(/\0+$/, '').trim();
+                    if (isTitle && !title) title = str;
+                    if (isArtist && !artist) artist = str;
+                  }
+                }
+                break;
+              }
+            }
+          }
+        }
+        return { title, artist, trackNo };
+      }
+
+      // ==========================================================================
+      // 埋め込みアートワーク（ジャケット画像）解析パーサー (完全オフライン・バニラJS)
+      // MP3(ID3v2) / FLAC / MP4-M4A のバイナリからアートワーク画像を抽出
+      // ==========================================================================
+      function detectMimeType(bytes, fallbackMime) {
+        if (!bytes || bytes.length < 4) return fallbackMime || 'image/jpeg';
+        // JPEG: FF D8 FF
+        if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'image/jpeg';
+        // PNG: 89 50 4E 47
+        if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'image/png';
+        // GIF: 47 49 46
+        if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
+        // WEBP: RIFF...WEBP
+        if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+            bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+          return 'image/webp';
+        }
+        return fallbackMime || 'image/jpeg';
+      }
+
+      function createBlobUrl(bytes, suggestedMime) {
+        if (!bytes || bytes.length === 0) return null;
+        const mime = detectMimeType(bytes, suggestedMime);
+        const blob = new Blob([bytes], { type: mime });
+        return URL.createObjectURL(blob);
+      }
+
+      async function extractEmbeddedArtwork(file) {
+        if (!file) return null;
+        try {
+          const lowerName = file.name.toLowerCase();
+          if (lowerName.endsWith('.mp3')) {
+            return await parseId3v2Artwork(file);
+          } else if (lowerName.endsWith('.flac')) {
+            return await parseFlacArtwork(file);
+          } else if (lowerName.endsWith('.m4a') || lowerName.endsWith('.mp4') || lowerName.endsWith('.aac')) {
+            return await parseMp4Artwork(file);
+          }
+          let res = await parseId3v2Artwork(file);
+          if (!res) res = await parseMp4Artwork(file);
+          return res;
+        } catch (err) {
+          console.warn('埋め込みアートワーク抽出エラー:', err);
+          return null;
+        }
+      }
+
+      // MP3 (ID3v2.2 / ID3v2.3 / ID3v2.4) APIC/PIC フレーム解析
+      async function parseId3v2Artwork(file) {
+        const headerBuf = await file.slice(0, 10).arrayBuffer();
+        if (headerBuf.byteLength < 10) return null;
+        const h = new Uint8Array(headerBuf);
+
+        // "ID3"
+        if (h[0] !== 0x49 || h[1] !== 0x44 || h[2] !== 0x33) return null;
+
+        const version = h[3];
+        const tagSize = ((h[6] & 0x7f) << 21) | ((h[7] & 0x7f) << 14) | ((h[8] & 0x7f) << 7) | (h[9] & 0x7f);
+
+        // タグ全体を読み込み (最大12MB)
+        const readSize = Math.min(tagSize + 10, 12 * 1024 * 1024, file.size);
+        const tagBuf = await file.slice(0, readSize).arrayBuffer();
+        const data = new Uint8Array(tagBuf);
+        const limit = Math.min(data.length, tagSize + 10);
+        let offset = 10;
+
+        if (version === 2) {
+          // ID3v2.2: 3バイトID, 3バイトサイズ
+          while (offset + 6 < limit) {
+            const frameId = String.fromCharCode(data[offset], data[offset + 1], data[offset + 2]);
+            const frameSize = (data[offset + 3] << 16) | (data[offset + 4] << 8) | data[offset + 5];
+            offset += 6;
+            if (frameSize <= 0 || offset + frameSize > limit) break;
+
+            if (frameId === 'PIC') {
+              const enc = data[offset];
+              const format = String.fromCharCode(data[offset + 1], data[offset + 2], data[offset + 3]).toLowerCase();
+              const mime = (format === 'png') ? 'image/png' : 'image/jpeg';
+              let pos = offset + 5;
+              if (enc === 1) { // UTF-16
+                while (pos + 1 < offset + frameSize && !(data[pos] === 0 && data[pos + 1] === 0)) pos += 2;
+                pos += 2;
+              } else {
+                while (pos < offset + frameSize && data[pos] !== 0) pos++;
+                pos++;
+              }
+              if (pos < offset + frameSize) {
+                return createBlobUrl(data.subarray(pos, offset + frameSize), mime);
+              }
+            }
+            offset += frameSize;
+          }
+        } else if (version === 3 || version === 4) {
+          // ID3v2.3 / ID3v2.4: 4バイトID, 4バイトサイズ, 2バイトフラグ
+          while (offset + 10 < limit) {
+            const frameId = String.fromCharCode(data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
+            let frameSize;
+            if (version === 4) {
+              frameSize = ((data[offset + 4] & 0x7f) << 21) | ((data[offset + 5] & 0x7f) << 14) | ((data[offset + 6] & 0x7f) << 7) | (data[offset + 7] & 0x7f);
+            } else {
+              frameSize = (data[offset + 4] << 24) | (data[offset + 5] << 16) | (data[offset + 6] << 8) | data[offset + 7];
+            }
+            offset += 10;
+            if (frameSize <= 0 || offset + frameSize > limit) break;
+
+            if (frameId === 'APIC') {
+              const enc = data[offset];
+              let pos = offset + 1;
+
+              // MIME type 文字列 (null終端)
+              let mime = '';
+              while (pos < offset + frameSize && data[pos] !== 0) {
+                mime += String.fromCharCode(data[pos]);
+                pos++;
+              }
+              pos++; // nullをスキップ
+
+              // picture type (1 byte)
+              pos++;
+
+              // description (null終端)
+              if (enc === 1 || enc === 2) { // UTF-16
+                while (pos + 1 < offset + frameSize && !(data[pos] === 0 && data[pos + 1] === 0)) {
+                  pos += 2;
+                }
+                pos += 2;
+              } else {
+                while (pos < offset + frameSize && data[pos] !== 0) {
+                  pos++;
+                }
+                pos++;
+              }
+
+              if (pos < offset + frameSize) {
+                return createBlobUrl(data.subarray(pos, offset + frameSize), mime);
+              }
+            }
+            offset += frameSize;
+          }
+        }
+        return null;
+      }
+
+      // FLAC METADATA_BLOCK_PICTURE (Block Type 6) 解析
+      async function parseFlacArtwork(file) {
+        const readSize = Math.min(2 * 1024 * 1024, file.size);
+        const buf = await file.slice(0, readSize).arrayBuffer();
+        if (buf.byteLength < 4) return null;
+        const data = new Uint8Array(buf);
+
+        // "fLaC"
+        if (data[0] !== 0x66 || data[1] !== 0x4C || data[2] !== 0x61 || data[3] !== 0x43) return null;
+
+        let offset = 4;
+        let isLast = false;
+
+        while (offset + 4 < data.length && !isLast) {
+          const headerByte = data[offset];
+          isLast = (headerByte & 0x80) !== 0;
+          const blockType = headerByte & 0x7F;
+          const blockSize = (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+          offset += 4;
+
+          if (blockType === 6) { // METADATA_BLOCK_PICTURE
+            if (offset + blockSize > data.length) {
+              const fullBlockBuf = await file.slice(offset - 4, offset + blockSize).arrayBuffer();
+              return parseFlacPictureBlock(new Uint8Array(fullBlockBuf), 4);
+            }
+            return parseFlacPictureBlock(data, offset);
+          }
+          offset += blockSize;
+        }
+        return null;
+      }
+
+      function parseFlacPictureBlock(data, offset) {
+        let pos = offset;
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+        // picture type (4 bytes)
+        pos += 4;
+        // MIME length
+        const mimeLen = view.getUint32(pos, false);
+        pos += 4;
+        let mime = '';
+        for (let i = 0; i < mimeLen; i++) mime += String.fromCharCode(data[pos + i]);
+        pos += mimeLen;
+
+        // Description length
+        const descLen = view.getUint32(pos, false);
+        pos += 4 + descLen;
+
+        // width(4), height(4), depth(4), colors(4)
+        pos += 16;
+
+        // Data length
+        const dataLen = view.getUint32(pos, false);
+        pos += 4;
+
+        if (pos + dataLen <= data.length) {
+          return createBlobUrl(data.subarray(pos, pos + dataLen), mime);
+        }
+        return null;
+      }
+
+      // MP4 / M4A (covr アトム内の data) 解析
+      async function parseMp4Artwork(file) {
+        const readSize = Math.min(4 * 1024 * 1024, file.size);
+        const buf = await file.slice(0, readSize).arrayBuffer();
+        let result = scanMp4ForCovr(new Uint8Array(buf));
+        if (result) return result;
+
+        if (file.size > readSize) {
+          const tailSize = Math.min(3 * 1024 * 1024, file.size);
+          const tailBuf = await file.slice(file.size - tailSize, file.size).arrayBuffer();
+          result = scanMp4ForCovr(new Uint8Array(tailBuf));
+          if (result) return result;
+        }
+        return null;
+      }
+
+      function scanMp4ForCovr(data) {
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        const len = data.length;
+
+        for (let i = 0; i < len - 8; i++) {
+          if (data[i] === 0x63 && data[i + 1] === 0x6F && data[i + 2] === 0x76 && data[i + 3] === 0x72) {
+            // 'covr'
+            let covrSize = (i >= 4) ? view.getUint32(i - 4, false) : 0;
+            if (covrSize <= 8 || covrSize > 10 * 1024 * 1024) covrSize = 2 * 1024 * 1024;
+
+            const covrEnd = Math.min(len, i + covrSize);
+            for (let j = i + 4; j < covrEnd - 16; j++) {
+              if (data[j] === 0x64 && data[j + 1] === 0x61 && data[j + 2] === 0x74 && data[j + 3] === 0x61) {
+                // 'data'
+                const dataSize = (j >= 4) ? view.getUint32(j - 4, false) : 0;
+                const typeFlag = view.getUint32(j + 4, false) & 0xFF;
+                let mime = 'image/jpeg';
+                if (typeFlag === 14) mime = 'image/png';
+
+                const imgStart = j + 12; // 4('data') + 4(flags) + 4(locale)
+                const imgEnd = (dataSize > 16 && j - 4 + dataSize <= len) ? (j - 4 + dataSize) : covrEnd;
+
+                if (imgStart < imgEnd) {
+                  return createBlobUrl(data.subarray(imgStart, imgEnd), mime);
+                }
+              }
+            }
+          }
+        }
+        return null;
+      }
+
+      // UIにアートワーク画像を適用
+      async function updateArtworkForTrack(file) {
+        if (currentArtworkUrl) {
+          URL.revokeObjectURL(currentArtworkUrl);
+          currentArtworkUrl = null;
+        }
+
+        const url = await extractEmbeddedArtwork(file);
+        currentArtworkUrl = url;
+
+        if (url) {
+          artworkImg.src = url;
+          artworkImg.style.display = 'block';
+          vinylDisc.style.display = 'none';
+
+          minibarThumbImg.src = url;
+          minibarThumbImg.style.display = 'block';
+          minibarThumbSvg.style.display = 'none';
+        } else {
+          artworkImg.removeAttribute('src');
+          artworkImg.style.display = 'none';
+          vinylDisc.style.display = 'flex';
+
+          minibarThumbImg.removeAttribute('src');
+          minibarThumbImg.style.display = 'none';
+          minibarThumbSvg.style.display = 'block';
+        }
+      }
+
+      // ==========================================================================
+      // タブ切り替え
+      // ==========================================================================
+      function switchTab(target) {
+        if (target === 'list') {
+          tabListBtn.classList.add('active');
+          tabPlayerBtn.classList.remove('active');
+          viewList.classList.add('active');
+          viewPlayer.classList.remove('active');
+        } else {
+          tabPlayerBtn.classList.add('active');
+          tabListBtn.classList.remove('active');
+          viewPlayer.classList.add('active');
+          viewList.classList.remove('active');
+        }
+      }
+
+      tabListBtn.addEventListener('click', () => switchTab('list'));
+      tabPlayerBtn.addEventListener('click', () => switchTab('player'));
+      // ミニバーのテキスト領域タップでプレイヤー画面へ切り替え
+      minibarTextArea.addEventListener('click', () => switchTab('player'));
+
+      // ==========================================================================
+      // Web Audio API & スペアナ (スペクトラムアナライザー)
+      // ==========================================================================
+      function initAudioContext() {
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          return;
+        }
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64; // モバイル向けに軽量かつ視覚的に美しい解像度
+          sourceNode = audioCtx.createMediaElementSource(audio);
+          sourceNode.connect(analyser);
+          analyser.connect(audioCtx.destination);
+          startVisualizer();
+        } catch (e) {
+          console.warn('AudioContext初期化エラー (環境の制限):', e);
+        }
+      }
+
+      function startVisualizer() {
+        if (visualizerRunning) return;
+        visualizerRunning = true;
+
+        const bufferLength = analyser ? analyser.frequencyBinCount : 32;
+        const dataArray = new Uint8Array(bufferLength);
+
+        function draw() {
+          requestAnimationFrame(draw);
+
+          // 描画サイズをコンテナの横幅に動的同期（ワイド画面での解像度ぼやけ防止）
+          if (visualizerCanvas.clientWidth && visualizerCanvas.width !== visualizerCanvas.clientWidth) {
+            visualizerCanvas.width = visualizerCanvas.clientWidth;
+          }
+
+          const width = visualizerCanvas.width;
+          const height = visualizerCanvas.height;
+
+          // 背景クリア（ダークウッド）
+          canvasCtx.fillStyle = '#23160a';
+          canvasCtx.fillRect(0, 0, width, height);
+
+          if (!analyser || audio.paused) {
+            // アイドル時のフラットライン
+            canvasCtx.fillStyle = '#6a4a28';
+            canvasCtx.fillRect(0, height - 3, width, 2);
+            return;
+          }
+
+          analyser.getByteFrequencyData(dataArray);
+
+          const barCount = Math.max(28, Math.min(64, Math.floor(width / 13)));
+          const barWidth = (width / barCount) - 2;
+          let x = 1;
+
+          for (let i = 0; i < barCount; i++) {
+            // 低域〜中域を中心に使用
+            const dataIndex = Math.floor(i * (bufferLength / barCount));
+            const barHeight = ((dataArray[dataIndex] || 0) / 255) * (height - 4);
+
+            // 琥珀色〜ウッドゴールドグラデーション
+            const grad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+            grad.addColorStop(0, '#caa06d');
+            grad.addColorStop(0.5, '#ffaa2a');
+            grad.addColorStop(1, '#ffe08a');
+
+            canvasCtx.fillStyle = grad;
+            canvasCtx.fillRect(x, height - barHeight - 2, barWidth, barHeight + 2);
+
+            x += barWidth + 2;
+          }
+        }
+
+        draw();
+      }
+
+      // ==========================================================================
+      // ファイルシステム & フォルダ解析
+      // ==========================================================================
+      function parseFiles(files) {
+        if (!files || files.length === 0) return;
+
+        fileTree.clear();
+        playlist = [];
+
+        // ディレクトリを確実にツリーに登録するための再帰登録
+        function ensureDirExists(dirPath) {
+          if (!dirPath) return;
+          if (fileTree.has(dirPath)) return;
+
+          const parts = dirPath.split('/');
+          const dirName = parts[parts.length - 1];
+          const parentPath = parts.slice(0, -1).join('/');
+
+          ensureDirExists(parentPath);
+
+          fileTree.set(dirPath, {
+            name: dirName,
+            path: dirPath,
+            isDir: true,
+            parentPath: parentPath
+          });
+        }
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          // webkitRelativePath があればそれを使う、なければ name のみ
+          const fullPath = file.webkitRelativePath || file.name;
+          const parts = fullPath.split('/');
+
+          if (parts.length > 1) {
+            const dirPath = parts.slice(0, -1).join('/');
+            ensureDirExists(dirPath);
+          }
+
+          if (isAudioFile(file.name)) {
+            const parentPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+            const initialTrackNo = parseTrackNumberFromFilename(file.name);
+            const trackItem = {
+              name: file.name,
+              path: fullPath,
+              isDir: false,
+              fileObj: file,
+              parentPath: parentPath,
+              trackNo: initialTrackNo,
+              title: cleanTrackName(file.name),
+              artist: parentPath || 'ルート',
+              tagParsed: false
+            };
+            fileTree.set(fullPath, trackItem);
+            playlist.push(trackItem);
+          }
+        }
+
+        if (playlist.length === 0) {
+          showToast('音楽ファイルが見つかりませんでした');
+          renderList();
+          return;
+        }
+
+        // フォルダ別・優先順ソート（1: トラックNo昇順, 2: ファイル名昇順）
+        sortPlaylist();
+
+        // ルート階層または前回開いていたフォルダ階層を復帰
+        const savedFolder = localStorage.getItem(STORAGE_KEY_FOLDER);
+        if (savedFolder && (fileTree.has(savedFolder) || Array.from(fileTree.values()).some(it => it.parentPath === savedFolder))) {
+          currentPath = savedFolder;
+        } else {
+          currentPath = '';
+        }
+
+        renderList();
+        showToast(`${playlist.length}曲のファイルを読み込みました`);
+      }
+
+      // プレイリスト全体のソート（フォルダ順、フォルダ内は優先順位1: トラックNo昇順, 2: ファイル名昇順）
+      function sortPlaylist() {
+        const currentPlayingPath = (currentTrackIndex >= 0 && playlist[currentTrackIndex]) ? playlist[currentTrackIndex].path : null;
+        playlist.sort((a, b) => {
+          if (a.parentPath !== b.parentPath) {
+            return (a.parentPath || '').localeCompare(b.parentPath || '', undefined, { numeric: true, sensitivity: 'base' });
+          }
+          return compareTracks(a, b);
+        });
+        if (currentPlayingPath) {
+          currentTrackIndex = playlist.findIndex(t => t.path === currentPlayingPath);
+        }
+      }
+
+      // フォルダ内楽曲のタグ（トラック名・アーティスト名・トラックNo）を順次非同期解析してDOM更新
+      async function fetchTagsForFiles(filesToParse) {
+        for (const track of filesToParse) {
+          if (!track.tagParsed) {
+            extractTrackMetadata(track.fileObj).then((meta) => {
+              track.tagParsed = true;
+              let trackNoUpdated = false;
+              if (meta.title) track.title = meta.title;
+              if (meta.artist) track.artist = meta.artist;
+              if (meta.trackNo != null && meta.trackNo !== track.trackNo) {
+                track.trackNo = meta.trackNo;
+                trackNoUpdated = true;
+              }
+
+              // 一致するDOM要素があればテキストを即時更新
+              const escapedPath = CSS.escape ? CSS.escape(track.path) : track.path;
+              const li = fileListEl.querySelector(`li[data-track-path="${escapedPath}"]`);
+              if (li) {
+                const titleEl = li.querySelector('.file-title');
+                const metaEl = li.querySelector('.file-meta');
+                if (titleEl) titleEl.textContent = formatTrackDisplayTitle(track);
+                if (metaEl) metaEl.textContent = track.artist;
+              }
+
+              // 再生中の曲であればプレイヤー情報も更新
+              if (currentTrackIndex >= 0 && playlist[currentTrackIndex]?.path === track.path) {
+                updateTrackInfoUI(track);
+                setupMediaSession(track);
+              }
+
+              // トラック番号の更新によって曲順が変動した場合はソートとリストを再構成
+              if (trackNoUpdated) {
+                sortPlaylist();
+                renderList();
+              }
+            }).catch(() => {
+              track.tagParsed = true;
+            });
+          }
+        }
+      }
+
+      // ファイルリストのレンダリング
+      function renderList() {
+        // 空状態チェック
+        if (fileTree.size === 0) {
+          emptyStateEl.style.display = 'block';
+          fileListEl.style.display = 'none';
+          btnUp.disabled = true;
+          renderBreadcrumbs();
+          return;
+        }
+
+        emptyStateEl.style.display = 'none';
+        fileListEl.style.display = 'flex';
+        fileListEl.innerHTML = '';
+
+        // 親階層ボタンの状態
+        btnUp.disabled = (currentPath === '');
+
+        // パンくずの更新
+        renderBreadcrumbs();
+
+        // 現在の階層の子要素を取得
+        const dirs = [];
+        const files = [];
+
+        fileTree.forEach((item) => {
+          if (item.parentPath === currentPath) {
+            if (item.isDir) dirs.push(item);
+            else files.push(item);
+          }
+        });
+
+        // ソート（フォルダは名前順、曲は優先度1: トラックNo昇順、優先度2: ファイル名昇順）
+        dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        files.sort(compareTracks);
+
+        // フォルダ要素の描画
+        dirs.forEach((dir) => {
+          const li = document.createElement('li');
+          li.className = 'file-item is-folder';
+          li.innerHTML = `
+            <div class="file-icon folder-icon">
+              <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            </div>
+            <div class="file-info">
+              <div class="file-title">${escapeHtml(dir.name)}</div>
+              <div class="file-meta">フォルダ</div>
+            </div>
+            <svg style="width:20px;height:20px;fill:var(--wood-dark);" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          `;
+          li.addEventListener('click', () => {
+            currentPath = dir.path;
+            localStorage.setItem(STORAGE_KEY_FOLDER, currentPath);
+            renderList();
+          });
+          fileListEl.appendChild(li);
+        });
+
+        // 曲要素の描画（優先順位順、トラック番号付きトラック名・アーティスト名を表示）
+        files.forEach((fileItem) => {
+          const isCurrentlyPlaying = (currentTrackIndex >= 0 && playlist[currentTrackIndex]?.path === fileItem.path);
+          const li = document.createElement('li');
+          li.className = `file-item is-song ${isCurrentlyPlaying ? 'playing' : ''}`;
+          li.setAttribute('data-track-path', fileItem.path);
+          
+          li.innerHTML = `
+            <div class="file-icon song-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </div>
+            <div class="file-info">
+              <div class="file-title">${escapeHtml(formatTrackDisplayTitle(fileItem))}</div>
+              <div class="file-meta">${escapeHtml(fileItem.artist)}</div>
+            </div>
+            ${isCurrentlyPlaying ? `
+              <div class="playing-indicator">
+                <span></span><span></span><span></span>
+              </div>
+            ` : ''}
+          `;
+
+          li.addEventListener('click', () => {
+            const idx = playlist.findIndex(p => p.path === fileItem.path);
+            if (idx !== -1) {
+              playTrackByIndex(idx);
+            }
+          });
+
+          fileListEl.appendChild(li);
+        });
+
+        // 現在表示されている曲のタグ（トラック名・アーティスト名・トラックNo）を非同期解析
+        fetchTagsForFiles(files);
+      }
+
+      function escapeHtml(str) {
+        return (str || '').replace(/[&<>"']/g, function(m) {
+          return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+          }[m];
+        });
+      }
+
+      // パンくずリスト更新
+      function renderBreadcrumbs() {
+        breadcrumbsEl.innerHTML = '';
+        const rootSpan = document.createElement('span');
+        rootSpan.className = 'crumb-item';
+        rootSpan.textContent = '🏠 /';
+        rootSpan.addEventListener('click', () => {
+          currentPath = '';
+          localStorage.setItem(STORAGE_KEY_FOLDER, '');
+          renderList();
+        });
+        breadcrumbsEl.appendChild(rootSpan);
+
+        if (!currentPath) return;
+
+        const parts = currentPath.split('/');
+        let accumPath = '';
+
+        parts.forEach((part) => {
+          accumPath = accumPath ? `${accumPath}/${part}` : part;
+          const target = accumPath;
+
+          const sep = document.createElement('span');
+          sep.className = 'crumb-separator';
+          sep.textContent = '/';
+          breadcrumbsEl.appendChild(sep);
+
+          const crumb = document.createElement('span');
+          crumb.className = 'crumb-item';
+          crumb.textContent = part;
+          crumb.addEventListener('click', () => {
+            currentPath = target;
+            localStorage.setItem(STORAGE_KEY_FOLDER, target);
+            renderList();
+          });
+          breadcrumbsEl.appendChild(crumb);
+        });
+
+        breadcrumbsEl.scrollLeft = breadcrumbsEl.scrollWidth;
+      }
+
+      // ==========================================================================
+      // [ 🏠 トップ ] ボタン 長押し判定 (通常タップ: ルートへ / 長押し: フォルダ選択ダイアログ)
+      // ==========================================================================
+      let longPressTimer = null;
+      let isLongPressed = false;
+      const LONG_PRESS_DURATION = 900; // ms
+
+      function triggerFolderDialog() {
+        folderPickerInput.value = '';
+        folderPickerInput.click();
+      }
+
+      function startLongPress(e) {
+        isLongPressed = false;
+        homeLongPressBar.style.transition = `width ${LONG_PRESS_DURATION}ms linear`;
+        homeLongPressBar.style.width = '100%';
+
+        longPressTimer = setTimeout(() => {
+          isLongPressed = true;
+          // バイブレーション (対応端末のみ)
+          if (navigator.vibrate) navigator.vibrate(50);
+          showToast('フォルダ選択ダイアログを開きます');
+          triggerFolderDialog();
+          resetLongPress();
+        }, LONG_PRESS_DURATION);
+      }
+
+      function resetLongPress() {
+        clearTimeout(longPressTimer);
+        homeLongPressBar.style.transition = 'width 0.15s ease';
+        homeLongPressBar.style.width = '0%';
+      }
+
+      // ポインターイベント対応
+      btnHome.addEventListener('pointerdown', startLongPress);
+      btnHome.addEventListener('pointerup', (e) => {
+        if (!isLongPressed) {
+          // 通常タップ: ルートへジャンプ
+          currentPath = '';
+          localStorage.setItem(STORAGE_KEY_FOLDER, '');
+          renderList();
+        }
+        resetLongPress();
+      });
+      btnHome.addEventListener('pointercancel', resetLongPress);
+      btnHome.addEventListener('pointerleave', resetLongPress);
+
+      // 1階層上へボタン
+      btnUp.addEventListener('click', () => {
+        if (!currentPath) return;
+        const parts = currentPath.split('/');
+        parts.pop();
+        currentPath = parts.join('/');
+        localStorage.setItem(STORAGE_KEY_FOLDER, currentPath);
+        renderList();
+      });
+
+      // フォルダインプットの変更検知
+      folderPickerInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          parseFiles(e.target.files);
+        }
+      });
+
+      // ファイルインプット（複数曲選択）の変更検知
+      filesPickerInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          parseFiles(e.target.files);
+        }
+      });
+
+      // ==========================================================================
+      // 再生制御ロジック
+      // ==========================================================================
+      function playTrackByIndex(index, seekSeconds = 0, autoplay = true) {
+        if (index < 0 || index >= playlist.length) return;
+
+        currentTrackIndex = index;
+        const track = playlist[index];
+
+        initAudioContext();
+
+        // 以前のObjectURLがあれば解放
+        if (audio.src && audio.src.startsWith('blob:')) {
+          URL.revokeObjectURL(audio.src);
+        }
+
+        const url = URL.createObjectURL(track.fileObj);
+        audio.src = url;
+        audio.currentTime = seekSeconds;
+
+        updateTrackInfoUI(track);
+        renderList();
+
+        // フォルダ階層の記憶
+        if (track.parentPath !== undefined) {
+          localStorage.setItem(STORAGE_KEY_FOLDER, track.parentPath);
+        }
+
+        // タグが未取得なら即座にメタデータ（トラック名・アーティスト名・トラックNo）を抽出
+        if (!track.tagParsed) {
+          extractTrackMetadata(track.fileObj).then((meta) => {
+            track.tagParsed = true;
+            let trackNoUpdated = false;
+            if (meta.title) track.title = meta.title;
+            if (meta.artist) track.artist = meta.artist;
+            if (meta.trackNo != null && meta.trackNo !== track.trackNo) {
+              track.trackNo = meta.trackNo;
+              trackNoUpdated = true;
+            }
+            if (currentTrackIndex === index) {
+              updateTrackInfoUI(track);
+              setupMediaSession(track);
+            }
+            if (trackNoUpdated) {
+              sortPlaylist();
+              renderList();
+            }
+          }).catch(() => {
+            track.tagParsed = true;
+          });
+        }
+
+        // 埋め込みアートワークを非同期抽出して表示更新
+        updateArtworkForTrack(track.fileObj).then(() => {
+          setupMediaSession(track);
+        });
+
+        if (autoplay) {
+          audio.play().then(() => {
+            updatePlayPauseUI(true);
+          }).catch((err) => {
+            console.warn('自動再生待機:', err);
+            updatePlayPauseUI(false);
+          });
+        } else {
+          updatePlayPauseUI(false);
+        }
+
+        savePlaybackState();
+      }
+
+      function updateTrackInfoUI(track) {
+        const title = formatTrackDisplayTitle(track);
+        const artist = track.artist || (track.parentPath || 'ルートフォルダ');
+
+        playerTitle.textContent = title;
+        playerFolder.textContent = artist;
+
+        minibarTitle.textContent = title;
+        minibarSub.textContent = artist;
+
+        // ミニバーのアクションボタンを通常の再生ボタンに復帰
+        restoreMinibarToNormal();
+      }
+
+      function updatePlayPauseUI(isPlaying) {
+        // メインボタンアイコン切り替え
+        if (isPlaying) {
+          mainPlayIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+          btnPlayPause.classList.add('is-playing');
+          minibarPlayIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+          vinylDisc.classList.add('spinning');
+          vinylDisc.classList.remove('paused');
+        } else {
+          mainPlayIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+          btnPlayPause.classList.remove('is-playing');
+          minibarPlayIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+          vinylDisc.classList.add('paused');
+        }
+      }
+
+      function togglePlayPause() {
+        initAudioContext();
+
+        if (currentTrackIndex === -1) {
+          if (playlist.length > 0) {
+            playTrackByIndex(0);
+          } else {
+            showToast('音楽フォルダを選択してください');
+          }
+          return;
+        }
+
+        if (audio.paused) {
+          audio.play().then(() => {
+            updatePlayPauseUI(true);
+          }).catch(e => console.warn(e));
+        } else {
+          audio.pause();
+          updatePlayPauseUI(false);
+        }
+      }
+
+      function stopPlayback() {
+        audio.pause();
+        audio.currentTime = 0;
+        updatePlayPauseUI(false);
+        savePlaybackState();
+      }
+
+      function playNextTrack(isAutoNext = false) {
+        if (playlist.length === 0) return;
+
+        const currentTrack = playlist[currentTrackIndex];
+        const currentFolder = currentTrack ? currentTrack.parentPath : '';
+        const folderTracks = playlist.filter(t => t.parentPath === currentFolder);
+
+        if (isAutoNext) {
+          // 自動遷移（曲終了時）: 同フォルダ内の曲を対象とする
+          if (folderTracks.length === 0) return;
+
+          if (isShuffle) {
+            if (folderTracks.length === 1) {
+              if (isRepeat) playTrackByIndex(currentTrackIndex);
+              else stopPlayback();
+              return;
+            }
+            let nextT;
+            do {
+              nextT = folderTracks[Math.floor(Math.random() * folderTracks.length)];
+            } while (nextT.path === currentTrack?.path);
+            const targetIdx = playlist.findIndex(t => t.path === nextT.path);
+            if (targetIdx !== -1) playTrackByIndex(targetIdx);
+          } else {
+            const curIdxInFolder = folderTracks.findIndex(t => t.path === currentTrack?.path);
+            const nextIdxInFolder = curIdxInFolder + 1;
+
+            if (nextIdxInFolder < folderTracks.length) {
+              // 同フォルダ内の次の曲へ
+              const nextT = folderTracks[nextIdxInFolder];
+              const targetIdx = playlist.findIndex(t => t.path === nextT.path);
+              if (targetIdx !== -1) playTrackByIndex(targetIdx);
+            } else {
+              // フォルダ最後の曲が終了
+              if (isRepeat) {
+                // リピート有効: 同フォルダの先頭曲へループ
+                const firstT = folderTracks[0];
+                const targetIdx = playlist.findIndex(t => t.path === firstT.path);
+                if (targetIdx !== -1) playTrackByIndex(targetIdx);
+              } else {
+                // リピート無効: 停止
+                stopPlayback();
+                showToast('フォルダ内の全曲の再生が終了しました');
+              }
+            }
+          }
+        } else {
+          // 手動操作（[次へ] ボタンまたはジャケット右タップ）
+          let nextIndex;
+          if (isShuffle && playlist.length > 1) {
+            do {
+              nextIndex = Math.floor(Math.random() * playlist.length);
+            } while (nextIndex === currentTrackIndex);
+          } else {
+            nextIndex = (currentTrackIndex + 1) % playlist.length;
+          }
+          playTrackByIndex(nextIndex);
+        }
+      }
+
+      function playPrevTrack() {
+        if (playlist.length === 0) return;
+
+        // 3秒以上再生していれば曲頭に戻る
+        if (audio.currentTime > 3) {
+          audio.currentTime = 0;
+          return;
+        }
+
+        let prevIndex;
+        if (isShuffle && playlist.length > 1) {
+          do {
+            prevIndex = Math.floor(Math.random() * playlist.length);
+          } while (prevIndex === currentTrackIndex);
+        } else {
+          prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+        }
+
+        playTrackByIndex(prevIndex);
+      }
+
+      // イベントリスナー設定 (コントロールボタン)
+      btnPlayPause.addEventListener('click', togglePlayPause);
+      minibarPlayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlayPause();
+      });
+      btnStop.addEventListener('click', stopPlayback);
+      btnNext.addEventListener('click', () => playNextTrack(false));
+      btnPrev.addEventListener('click', playPrevTrack);
+
+      // リピートトグル（同フォルダ内ループ / 終了時停止）
+      btnRepeat.classList.toggle('toggle-active', isRepeat);
+      btnRepeat.addEventListener('click', () => {
+        isRepeat = !isRepeat;
+        btnRepeat.classList.toggle('toggle-active', isRepeat);
+        localStorage.setItem(STORAGE_KEY_REPEAT, isRepeat);
+        showToast(isRepeat ? 'リピート: 有効（同フォルダ内ループ）' : 'リピート: 無効（終了時停止）');
+      });
+
+      // ジャケットタップ（左スキップ・右スキップ）
+      touchPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playPrevTrack();
+      });
+      touchNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playNextTrack(false);
+      });
+
+      // シャッフルトグル
+      if (isShuffle) btnShuffle.classList.add('toggle-active');
+      btnShuffle.addEventListener('click', () => {
+        isShuffle = !isShuffle;
+        btnShuffle.classList.toggle('toggle-active', isShuffle);
+        localStorage.setItem(STORAGE_KEY_SHUFFLE, isShuffle);
+        showToast(isShuffle ? 'シャッフル: ON' : 'シャッフル: OFF');
+      });
+
+      // 音量スライダー
+      const savedVol = localStorage.getItem(STORAGE_KEY_VOL);
+      if (savedVol !== null) {
+        audio.volume = parseFloat(savedVol);
+        volumeSlider.value = savedVol;
+      } else {
+        audio.volume = 0.8;
+      }
+      volumeSlider.addEventListener('input', (e) => {
+        audio.volume = e.target.value;
+        localStorage.setItem(STORAGE_KEY_VOL, e.target.value);
+      });
+
+      // シークバー操作
+      seekSlider.addEventListener('input', () => {
+        isSeeking = true;
+        currentTimeEl.textContent = formatTime(seekSlider.value);
+      });
+
+      seekSlider.addEventListener('change', () => {
+        audio.currentTime = seekSlider.value;
+        isSeeking = false;
+        savePlaybackState();
+      });
+
+      // Audio要素イベントリスナー
+      audio.addEventListener('loadedmetadata', () => {
+        seekSlider.max = audio.duration || 100;
+        totalTimeEl.textContent = formatTime(audio.duration);
+      });
+
+      let lastSaveTime = 0;
+      audio.addEventListener('timeupdate', () => {
+        if (!isSeeking) {
+          seekSlider.value = audio.currentTime;
+          currentTimeEl.textContent = formatTime(audio.currentTime);
+        }
+
+        // 1秒ごとに状態保存
+        const now = Date.now();
+        if (now - lastSaveTime > 1000) {
+          lastSaveTime = now;
+          savePlaybackState();
+        }
+      });
+
+      // 曲終了時の自動曲送り (リピート判定連動)
+      audio.addEventListener('ended', () => {
+        playNextTrack(true);
+      });
+
+      audio.addEventListener('play', () => updatePlayPauseUI(true));
+      audio.addEventListener('pause', () => updatePlayPauseUI(false));
+
+      // ==========================================================================
+      // レジューム再生 & スリープ・リロード対策
+      // ==========================================================================
+      function savePlaybackState() {
+        if (currentTrackIndex >= 0 && playlist[currentTrackIndex]) {
+          const track = playlist[currentTrackIndex];
+          localStorage.setItem(STORAGE_KEY_FILE, track.name);
+          localStorage.setItem(STORAGE_KEY_TIME, audio.currentTime.toFixed(1));
+        }
+      }
+
+      // visibilitychange / beforeunload で確実に保存
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          savePlaybackState();
+        }
+      });
+      window.addEventListener('beforeunload', () => {
+        savePlaybackState();
+      });
+
+      // ミニバーのボタンを通常の「再生」ボタンに戻す
+      function restoreMinibarToNormal() {
+        minibarActionArea.innerHTML = '';
+        minibarActionArea.appendChild(minibarPlayBtn);
+      }
+
+      // アプリ起動時のレジュームチェック
+      function checkResumeState() {
+        const lastFileName = localStorage.getItem(STORAGE_KEY_FILE);
+        const lastTime = parseFloat(localStorage.getItem(STORAGE_KEY_TIME) || '0');
+
+        if (lastFileName) {
+          const dummyTrack = {
+            name: lastFileName,
+            title: cleanTrackName(lastFileName),
+            trackNo: parseTrackNumberFromFilename(lastFileName)
+          };
+          const title = formatTrackDisplayTitle(dummyTrack);
+
+          // ミニバーに前回の曲名と秒数を表示
+          minibarTitle.textContent = title;
+          minibarSub.textContent = `前回 ${formatTime(lastTime)} まで再生`;
+
+          playerTitle.textContent = title;
+          playerFolder.textContent = `前回の曲 (${formatTime(lastTime)}〜)`;
+
+          // 右端ボタンを <label> による [ 📂 続きをロード ] ボタンに置き換え
+          minibarActionArea.innerHTML = `
+            <label for="resume-picker-input" class="resume-label-btn" title="前回の続きから再生">
+              <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+              <span>続きをロード</span>
+            </label>
+          `;
+        }
+      }
+
+      // レジューム選択時の処理
+      resumePickerInput.addEventListener('change', (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const targetFileName = localStorage.getItem(STORAGE_KEY_FILE);
+        const resumeSec = parseFloat(localStorage.getItem(STORAGE_KEY_TIME) || '0');
+
+        // まずファイルシステム全体として取り込む
+        parseFiles(files);
+
+        // 一致するファイルを検索
+        let matchedIndex = -1;
+        for (let i = 0; i < playlist.length; i++) {
+          if (playlist[i].name === targetFileName) {
+            matchedIndex = i;
+            break;
+          }
+        }
+
+        if (matchedIndex !== -1) {
+          // 一致した場合: 前回の秒数をセットし、一時停止状態でスタンバイ
+          playTrackByIndex(matchedIndex, resumeSec, false);
+          const resumeTrack = playlist[matchedIndex];
+          showToast(`「${formatTrackDisplayTitle(resumeTrack)}」を${formatTime(resumeSec)}で待機しました`);
+        } else {
+          // 見つからなかった場合
+          showToast('前回の曲が見つかりませんでした');
+          restoreMinibarToNormal();
+          if (playlist.length > 0) {
+            // 通常の1曲目で待機
+            playTrackByIndex(0, 0, false);
+          }
+        }
+      });
+
+      // ==========================================================================
+      // MediaSession API (ロック画面・バックグラウンド操作対応)
+      // ==========================================================================
+      function setupMediaSession(track) {
+        if (!('mediaSession' in navigator)) return;
+
+        const title = formatTrackDisplayTitle(track);
+        const artist = track.artist || 'MokuPlay オフライン';
+        const album = track.parentPath || 'MokuPlay';
+
+        const artworkList = [];
+        if (currentArtworkUrl) {
+          artworkList.push({ src: currentArtworkUrl, sizes: '512x512' });
+        } else {
+          // 木目調アートワークのプレースホルダーSVG Data URL
+          const artworkSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+              <rect width="512" height="512" fill="#caa06d"/>
+              <circle cx="256" cy="256" r="220" fill="#24160a"/>
+              <circle cx="256" cy="256" r="100" fill="#caa06d"/>
+              <circle cx="256" cy="256" r="30" fill="#24160a"/>
+            </svg>
+          `;
+          artworkList.push({ src: `data:image/svg+xml;utf8,${encodeURIComponent(artworkSvg)}`, sizes: '512x512', type: 'image/svg+xml' });
+        }
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: title,
+          artist: artist,
+          album: album,
+          artwork: artworkList
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
+        navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
+        navigator.mediaSession.setActionHandler('previoustrack', () => playPrevTrack());
+        navigator.mediaSession.setActionHandler('nexttrack', () => playNextTrack(false));
+
+        try {
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime && !isNaN(details.seekTime)) {
+              audio.currentTime = details.seekTime;
+            }
+          });
+        } catch (e) {}
+      }
+
+      // --- 起動時初期化 ---
+      checkResumeState();
+
+    })();
+  </script>
+</body>
+</html>
