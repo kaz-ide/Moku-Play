@@ -1148,6 +1148,130 @@
         border-bottom-right-radius: 14px;
       }
     }
+
+    /* アプリ保存ボタン (ヘッダー右上) */
+    .btn-save-app {
+      min-height: 32px;
+      height: 32px;
+      padding: 0 10px;
+      font-size: 0.78rem;
+      border-radius: 8px;
+      gap: 4px;
+      box-shadow: 0 2px 4px rgba(102, 67, 30, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      white-space: nowrap;
+      background: linear-gradient(to bottom, #fffaf2 0%, #ebd4b8 60%, #dfbc94 100%);
+      color: var(--wood-shadow);
+    }
+    .btn-save-app svg {
+      width: 15px;
+      height: 15px;
+      fill: var(--wood-shadow);
+    }
+    .btn-save-app:hover {
+      filter: brightness(1.05);
+      border-color: var(--amber-glow);
+    }
+
+    @media (max-width: 380px) {
+      .btn-save-app span {
+        font-size: 0.72rem;
+      }
+      .btn-save-app {
+        padding: 0 6px;
+      }
+    }
+
+    /* アプリ保存・オフライン案内モーダル */
+    .wood-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(36, 22, 10, 0.68);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .wood-modal-overlay.show {
+      display: flex;
+    }
+    .wood-modal-card {
+      background: linear-gradient(135deg, #fdf6ec 0%, #f3dec5 100%);
+      border: 2px solid var(--wood-border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      max-width: 440px;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+      animation: modalPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes modalPop {
+      0% { opacity: 0; transform: scale(0.92); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .wood-modal-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--wood-border);
+      padding-bottom: 8px;
+    }
+    .wood-modal-header svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--wood-shadow);
+      flex-shrink: 0;
+    }
+    .wood-modal-header h3 {
+      font-size: 1.05rem;
+      color: var(--wood-shadow);
+      margin: 0;
+    }
+    .wood-modal-body {
+      font-size: 0.86rem;
+      color: var(--wood-dark);
+      line-height: 1.5;
+    }
+    .wood-modal-body code {
+      background: rgba(102, 67, 30, 0.12);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      color: var(--wood-shadow);
+    }
+    .offline-tips-box {
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid var(--wood-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .tip-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tip-badge {
+      font-weight: 700;
+      color: var(--wood-shadow);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .wood-modal-footer {
+      margin-top: 16px;
+    }
   </style>
 </head>
 <body>
@@ -1161,8 +1285,12 @@
           <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
           MokuPlay
         </div>
-        <div style="font-size: 0.74rem; font-weight: bold; color: var(--wood-dark); background: rgba(255,255,255,0.4); padding: 3px 8px; border-radius: 6px;">
-          Offline / 木目調
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <!-- 💾 アプリ保存ボタン (完全オフライン起動用) -->
+          <button id="btn-save-app" class="wood-btn btn-save-app" type="button" title="完全オフライン起動用として、このアプリ(HTML)自身を端末にダウンロード保存します">
+            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+            <span>💾 アプリ保存</span>
+          </button>
         </div>
       </div>
 
@@ -1227,6 +1355,9 @@
                 <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                 ファイルで選択 (クラウド対応)
               </label>
+            </div>
+            <div style="margin-top: 14px; font-size: 0.76rem; color: var(--wood-dark); opacity: 0.85;">
+              ✈️ 機内モード等で完全オフライン再生する場合は、右上の<strong>「💾 アプリ保存」</strong>で本体にダウンロードしてご利用ください。
             </div>
           </div>
 
@@ -1363,6 +1494,35 @@
     <audio id="audio-player" preload="metadata"></audio>
   </div>
 
+  <!-- アプリ保存完了・オフライン案内モーダル -->
+  <div id="save-modal" class="wood-modal-overlay">
+    <div class="wood-modal-card">
+      <div class="wood-modal-header">
+        <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        <h3>アプリを端末に保存しました</h3>
+      </div>
+      <div class="wood-modal-body">
+        <p><strong>ファイル名: <code>MokuPlay.html</code></strong></p>
+        <p style="margin-top: 8px;">保存した HTML ファイルを開けば、<strong>機内モード（完全オフライン）でも電波なしでプレイヤーが起動します。</strong></p>
+        <div class="offline-tips-box">
+          <div class="tip-row">
+            <span class="tip-badge">📱 iPhone / iPad</span>
+            <span>「ファイル」アプリの「ダウンロード」等からタップして開けます。Safariの共有メニューから「ホーム画面に追加」もおすすめです。</span>
+          </div>
+          <div class="tip-row">
+            <span class="tip-badge">🤖 Android / PC</span>
+            <span>ブラウザのダウンロード履歴やファイル管理アプリから直接ダブルタップ／タップで起動できます。</span>
+          </div>
+        </div>
+      </div>
+      <div class="wood-modal-footer">
+        <button id="btn-save-modal-close" class="wood-btn" type="button" style="width: 100%; height: 42px;">
+          OK (閉じる)
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /* ==========================================================================
        MokuPlay - 単一ファイル・完全オフライン音楽プレイヤー
@@ -1446,6 +1606,10 @@
       const btnAudioMode = document.getElementById('btn-audio-mode');
       const audioModeIcon = document.getElementById('audio-mode-icon');
       const audioModeText = document.getElementById('audio-mode-text');
+
+      const btnSaveApp = document.getElementById('btn-save-app');
+      const saveModal = document.getElementById('save-modal');
+      const btnSaveModalClose = document.getElementById('btn-save-modal-close');
 
       // --- アプリ状態 ---
       // 仮想ファイルシステム: Map<relativePath, { name, path, isDir, fileObj, parentPath }>
@@ -3177,6 +3341,90 @@
             }
           });
         } catch (e) {}
+      }
+
+      // ==========================================================================
+      // アプリ自身 (単一HTML) の端末ダウンロード保存 (完全オフライン起動用)
+      // ==========================================================================
+      function downloadSelfApp() {
+        try {
+          // 現在のDOMをクローンして一時的なセッション状態（Blob URLなど）をクリーンアップ
+          const docClone = document.documentElement.cloneNode(true);
+
+          // 一時的なblob URLの参照を消去（次回ファイル起動時に無効なURLを参照しないように）
+          const cloneAudio = docClone.querySelector('#audio-player');
+          if (cloneAudio) {
+            cloneAudio.removeAttribute('src');
+          }
+          const cloneArtwork = docClone.querySelector('#artwork-img');
+          if (cloneArtwork) {
+            cloneArtwork.removeAttribute('src');
+            cloneArtwork.style.display = 'none';
+          }
+          const cloneThumb = docClone.querySelector('#minibar-thumb-img');
+          if (cloneThumb) {
+            cloneThumb.removeAttribute('src');
+            cloneThumb.style.display = 'none';
+          }
+          const cloneThumbSvg = docClone.querySelector('#minibar-thumb-svg');
+          if (cloneThumbSvg) {
+            cloneThumbSvg.style.display = 'block';
+          }
+          const cloneVinyl = docClone.querySelector('#vinyl-disc');
+          if (cloneVinyl) {
+            cloneVinyl.style.display = 'flex';
+          }
+
+          // モーダルがもし開いていたら非表示状態にして保存
+          const cloneModal = docClone.querySelector('#save-modal');
+          if (cloneModal) {
+            cloneModal.classList.remove('show');
+          }
+
+          // 完全なHTML文字列を作成 (DOCTYPE + outerHTML)
+          const htmlContent = '<!DOCTYPE html>\n' + docClone.outerHTML;
+
+          // Blob作成 & ダウンロード実行 (完全クライアントサイド・外部通信一切なし)
+          const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'MokuPlay.html';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 4000);
+
+          // 案内モーダルを表示 & トースト通知
+          if (saveModal) {
+            saveModal.classList.add('show');
+          }
+          showToast('💾 MokuPlay.html をダウンロードしました');
+        } catch (err) {
+          console.error('アプリ保存エラー:', err);
+          showToast('保存中にエラーが発生しました: ' + (err.message || err));
+        }
+      }
+
+      if (btnSaveApp) {
+        btnSaveApp.addEventListener('click', downloadSelfApp);
+      }
+
+      if (btnSaveModalClose) {
+        btnSaveModalClose.addEventListener('click', () => {
+          if (saveModal) saveModal.classList.remove('show');
+        });
+      }
+
+      if (saveModal) {
+        saveModal.addEventListener('click', (e) => {
+          if (e.target === saveModal) {
+            saveModal.classList.remove('show');
+          }
+        });
       }
 
       // --- 起動時初期化 ---
