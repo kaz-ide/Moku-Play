@@ -616,6 +616,7 @@
 
     /* スペクトラムアナライザー (Canvas) */
     .visualizer-box {
+      position: relative;
       width: 100%;
       max-width: 380px;
       height: 48px;
@@ -633,6 +634,42 @@
       width: 100%;
       height: 100%;
       display: block;
+    }
+
+    /* モード切替バッジ（ダイレクト再生 / リアルスペアナ） */
+    .visualizer-mode-btn {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      background: rgba(28, 17, 8, 0.82);
+      border: 1px solid rgba(202, 160, 109, 0.5);
+      border-radius: 10px;
+      color: #ffd8a8;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      backdrop-filter: blur(2px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+      z-index: 5;
+    }
+
+    .visualizer-mode-btn:hover {
+      background: rgba(50, 30, 15, 0.95);
+      border-color: var(--amber-glow);
+      color: #fff;
+    }
+
+    .visualizer-mode-btn.active,
+    .visualizer-mode-btn.is-real {
+      color: #ffe08a;
+      border-color: rgba(255, 170, 42, 0.7);
+      background: rgba(45, 25, 10, 0.95);
     }
 
     /* 再生シークバー部 */
@@ -1230,9 +1267,13 @@
             </div>
           </div>
 
-          <!-- スペクトラムアナライザー -->
-          <div class="visualizer-box">
+          <!-- スペクトラムアナライザー & 再生モード切替 -->
+          <div class="visualizer-box" id="visualizer-box">
             <canvas id="visualizer-canvas" width="360" height="48"></canvas>
+            <button id="btn-audio-mode" class="visualizer-mode-btn" type="button" title="再生モード切替 (スリープ再生 / リアルスペアナ)">
+              <span id="audio-mode-icon">🎧</span>
+              <span id="audio-mode-text">スリープ対応</span>
+            </button>
           </div>
 
           <!-- シークバー & 時間 -->
@@ -1336,10 +1377,22 @@
       const STORAGE_KEY_SHUFFLE = 'mokuplay_shuffle';
       const STORAGE_KEY_REPEAT = 'mokuplay_repeat';
       const STORAGE_KEY_VOL = 'mokuplay_volume';
+      const STORAGE_KEY_AUDIO_MODE = 'mokuplay_audio_mode'; // 'direct' または 'real'
       const SUPPORTED_EXTS = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.webm'];
 
+      // iOS / iPadOS デバイスの判定
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // iOSのバックグラウンド再生を最大化するためのAudioSession設定（対応環境のみ）
+      if ('audioSession' in navigator) {
+        try {
+          navigator.audioSession.type = 'playback';
+        } catch (_) {}
+      }
+
       // --- DOM要素キャッシュ ---
-      const audio = document.getElementById('audio-player');
+      let audio = document.getElementById('audio-player');
       const tabListBtn = document.getElementById('tab-list-btn');
       const tabPlayerBtn = document.getElementById('tab-player-btn');
       const viewList = document.getElementById('view-list');
@@ -1390,6 +1443,9 @@
       const toastEl = document.getElementById('toast-msg');
       const visualizerCanvas = document.getElementById('visualizer-canvas');
       const canvasCtx = visualizerCanvas.getContext('2d');
+      const btnAudioMode = document.getElementById('btn-audio-mode');
+      const audioModeIcon = document.getElementById('audio-mode-icon');
+      const audioModeText = document.getElementById('audio-mode-text');
 
       // --- アプリ状態 ---
       // 仮想ファイルシステム: Map<relativePath, { name, path, isDir, fileObj, parentPath }>
@@ -1401,11 +1457,15 @@
       let isRepeat = localStorage.getItem(STORAGE_KEY_REPEAT) !== 'false'; // 初期状態は有効 (true)
       let currentArtworkUrl = null; // メモリ管理用URLキャッシュ
 
+      // 再生モード: iOSはデフォルトで'direct'（スリープ時も絶対音が止まらない）、PC/Android等は'real'（リアルスペアナ）
+      let audioMode = localStorage.getItem(STORAGE_KEY_AUDIO_MODE) || (isIOS ? 'direct' : 'real');
+
       // Web Audio API
       let audioCtx = null;
       let analyser = null;
       let sourceNode = null;
       let visualizerRunning = false;
+      let visualizerAnimId = null;
 
       // シークバー操作中フラグ
       let isSeeking = false;
@@ -2068,38 +2128,138 @@
       minibarTextArea.addEventListener('click', () => switchTab('player'));
 
       // ==========================================================================
-      // Web Audio API & スペアナ (スペクトラムアナライザー)
+      // Web Audio API & スペアナ (スペクトラムアナライザー) & 再生モード制御
       // ==========================================================================
+      function updateAudioModeUI() {
+        if (!btnAudioMode) return;
+        if (audioMode === 'direct') {
+          audioModeIcon.textContent = '🎧';
+          audioModeText.textContent = 'スリープ対応';
+          btnAudioMode.classList.remove('active');
+          btnAudioMode.title = 'ダイレクト再生モード（画面スリープ・別アプリ時も音が鳴り続けます）。タップでリアルスペアナへ';
+        } else {
+          audioModeIcon.textContent = '📊';
+          audioModeText.textContent = 'リアルスペアナ';
+          btnAudioMode.classList.add('active');
+          btnAudioMode.title = 'リアルスペアナモード（Web Audio API周波数解析）。タップでスリープ対応へ';
+        }
+      }
+
+      function recreateAudioElement() {
+        const oldAudio = audio;
+        const wasPaused = oldAudio.paused;
+        const curTime = oldAudio.currentTime;
+        const curSrc = oldAudio.src;
+        const curVol = oldAudio.volume;
+
+        // Web Audio リソースを安全に切断・解放
+        if (sourceNode) {
+          try { sourceNode.disconnect(); } catch (_) {}
+          sourceNode = null;
+        }
+        if (analyser) {
+          try { analyser.disconnect(); } catch (_) {}
+          analyser = null;
+        }
+        if (audioCtx) {
+          try {
+            audioCtx.close();
+          } catch (_) {}
+          audioCtx = null;
+        }
+
+        try {
+          oldAudio.pause();
+          oldAudio.removeAttribute('src');
+          oldAudio.load();
+        } catch (_) {}
+
+        // 新しいAudio要素を作成（Web Audio非接続のネイティブ直接出力ルートを復元）
+        const newAudio = document.createElement('audio');
+        newAudio.id = 'audio-player';
+        newAudio.preload = 'metadata';
+        newAudio.volume = curVol;
+
+        if (oldAudio.parentNode) {
+          oldAudio.parentNode.replaceChild(newAudio, oldAudio);
+        }
+        audio = newAudio;
+        attachAudioEventListeners(audio);
+
+        if (curSrc) {
+          audio.src = curSrc;
+          audio.currentTime = curTime;
+          if (!wasPaused) {
+            audio.play().catch(e => console.warn('再生成後の自動再生:', e));
+          }
+        }
+      }
+
+      function toggleAudioMode() {
+        if (audioMode === 'direct') {
+          audioMode = 'real';
+          localStorage.setItem(STORAGE_KEY_AUDIO_MODE, 'real');
+          updateAudioModeUI();
+          initAudioContext();
+          showToast('📊 リアルスペアナモードに切り替えました');
+        } else {
+          audioMode = 'direct';
+          localStorage.setItem(STORAGE_KEY_AUDIO_MODE, 'direct');
+          updateAudioModeUI();
+          recreateAudioElement();
+          showToast('🎧 スリープ対応ダイレクト再生に切り替えました');
+        }
+      }
+
+      if (btnAudioMode) {
+        btnAudioMode.addEventListener('click', toggleAudioMode);
+      }
+
       function initAudioContext() {
+        // ダイレクト再生モードの場合はWeb Audio APIを経由させない（iOSスリープ対策）
+        if (audioMode === 'direct') {
+          return;
+        }
+
         if (audioCtx) {
           if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
+            audioCtx.resume().catch(() => {});
           }
           return;
         }
+
         try {
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
           audioCtx = new AudioContextClass();
           analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64; // モバイル向けに軽量かつ視覚的に美しい解像度
+          analyser.fftSize = 64; // モバイル向けに軽量かつ美しい解像度
           sourceNode = audioCtx.createMediaElementSource(audio);
           sourceNode.connect(analyser);
           analyser.connect(audioCtx.destination);
-          startVisualizer();
+          
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
         } catch (e) {
           console.warn('AudioContext初期化エラー (環境の制限):', e);
         }
       }
 
       function startVisualizer() {
-        if (visualizerRunning) return;
-        visualizerRunning = true;
+        if (visualizerAnimId) return; // 既にループ中
 
-        const bufferLength = analyser ? analyser.frequencyBinCount : 32;
+        const bufferLength = 32;
         const dataArray = new Uint8Array(bufferLength);
 
         function draw() {
-          requestAnimationFrame(draw);
+          // バックグラウンド・スリープ時は描画ループを完全に停止しCPU負荷をゼロに保つ
+          if (document.hidden) {
+            visualizerAnimId = null;
+            return;
+          }
+
+          visualizerAnimId = requestAnimationFrame(draw);
 
           // 描画サイズをコンテナの横幅に動的同期（ワイド画面での解像度ぼやけ防止）
           if (visualizerCanvas.clientWidth && visualizerCanvas.width !== visualizerCanvas.clientWidth) {
@@ -2113,38 +2273,63 @@
           canvasCtx.fillStyle = '#23160a';
           canvasCtx.fillRect(0, 0, width, height);
 
-          if (!analyser || audio.paused) {
-            // アイドル時のフラットライン
+          if (audio.paused) {
+            // アイドル時の落ち着いたフラットライン
             canvasCtx.fillStyle = '#6a4a28';
             canvasCtx.fillRect(0, height - 3, width, 2);
             return;
           }
 
-          analyser.getByteFrequencyData(dataArray);
-
           const barCount = Math.max(28, Math.min(64, Math.floor(width / 13)));
           const barWidth = (width / barCount) - 2;
           let x = 1;
 
-          for (let i = 0; i < barCount; i++) {
-            // 低域〜中域を中心に使用
-            const dataIndex = Math.floor(i * (bufferLength / barCount));
-            const barHeight = ((dataArray[dataIndex] || 0) / 255) * (height - 4);
+          if (audioMode === 'real' && analyser) {
+            // --- リアルスペアナ (Web Audio API FFT解析) ---
+            analyser.getByteFrequencyData(dataArray);
 
-            // 琥珀色〜ウッドゴールドグラデーション
-            const grad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
-            grad.addColorStop(0, '#caa06d');
-            grad.addColorStop(0.5, '#ffaa2a');
-            grad.addColorStop(1, '#ffe08a');
+            for (let i = 0; i < barCount; i++) {
+              const dataIndex = Math.floor(i * (dataArray.length / barCount));
+              const barHeight = ((dataArray[dataIndex] || 0) / 255) * (height - 4);
 
-            canvasCtx.fillStyle = grad;
-            canvasCtx.fillRect(x, height - barHeight - 2, barWidth, barHeight + 2);
+              const grad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+              grad.addColorStop(0, '#caa06d');
+              grad.addColorStop(0.5, '#ffaa2a');
+              grad.addColorStop(1, '#ffe08a');
 
-            x += barWidth + 2;
+              canvasCtx.fillStyle = grad;
+              canvasCtx.fillRect(x, height - barHeight - 2, barWidth, barHeight + 2);
+              x += barWidth + 2;
+            }
+          } else {
+            // --- ダイレクト再生モード用 疑似スペアナアニメーション ---
+            // Web Audio API を一切使用しないため iOS スリープ・バックグラウンド再生が100%持続
+            const now = performance.now() * 0.005;
+            const curT = audio.currentTime;
+
+            for (let i = 0; i < barCount; i++) {
+              const normI = i / barCount;
+              // 低域〜中域にピークのある音楽的エンベロープ
+              const baseCurve = Math.pow(1 - normI * 0.65, 1.3);
+              const beat1 = Math.sin(curT * 4.3 + normI * 6.28);
+              const beat2 = Math.cos(curT * 2.1 - normI * 3.14);
+              const wave = Math.sin(now * 1.6 + i * 0.45) * 0.3 + Math.sin(now * 3.1 - i * 0.25) * 0.2;
+              const val = Math.max(0.08, (0.45 + 0.32 * beat1 + 0.22 * beat2 + wave) * baseCurve);
+              const barHeight = Math.min(height - 4, Math.max(3, val * (height - 4)));
+
+              const grad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+              grad.addColorStop(0, '#caa06d');
+              grad.addColorStop(0.5, '#ffaa2a');
+              grad.addColorStop(1, '#ffe08a');
+
+              canvasCtx.fillStyle = grad;
+              canvasCtx.fillRect(x, height - barHeight - 2, barWidth, barHeight + 2);
+              x += barWidth + 2;
+            }
           }
         }
 
-        draw();
+        visualizerAnimId = requestAnimationFrame(draw);
       }
 
       // ==========================================================================
@@ -2559,7 +2744,9 @@
         currentTrackIndex = index;
         const track = playlist[index];
 
-        initAudioContext();
+        if (audioMode === 'real') {
+          initAudioContext();
+        }
 
         // 以前のObjectURLがあれば解放
         if (audio.src && audio.src.startsWith('blob:')) {
@@ -2652,7 +2839,9 @@
       }
 
       function togglePlayPause() {
-        initAudioContext();
+        if (audioMode === 'real') {
+          initAudioContext();
+        }
 
         if (currentTrackIndex === -1) {
           if (playlist.length > 0) {
@@ -2824,34 +3013,42 @@
         savePlaybackState();
       });
 
-      // Audio要素イベントリスナー
-      audio.addEventListener('loadedmetadata', () => {
-        seekSlider.max = audio.duration || 100;
-        totalTimeEl.textContent = formatTime(audio.duration);
-      });
+      // Audio要素イベントリスナー登録関数
+      function attachAudioEventListeners(targetAudio) {
+        targetAudio.addEventListener('loadedmetadata', () => {
+          seekSlider.max = targetAudio.duration || 100;
+          totalTimeEl.textContent = formatTime(targetAudio.duration);
+        });
 
-      let lastSaveTime = 0;
-      audio.addEventListener('timeupdate', () => {
-        if (!isSeeking) {
-          seekSlider.value = audio.currentTime;
-          currentTimeEl.textContent = formatTime(audio.currentTime);
-        }
+        let lastSaveTime = 0;
+        targetAudio.addEventListener('timeupdate', () => {
+          if (!isSeeking) {
+            seekSlider.value = targetAudio.currentTime;
+            currentTimeEl.textContent = formatTime(targetAudio.currentTime);
+          }
 
-        // 1秒ごとに状態保存
-        const now = Date.now();
-        if (now - lastSaveTime > 1000) {
-          lastSaveTime = now;
-          savePlaybackState();
-        }
-      });
+          // 1秒ごとに状態保存
+          const now = Date.now();
+          if (now - lastSaveTime > 1000) {
+            lastSaveTime = now;
+            savePlaybackState();
+          }
+        });
 
-      // 曲終了時の自動曲送り (リピート判定連動)
-      audio.addEventListener('ended', () => {
-        playNextTrack(true);
-      });
+        // 曲終了時の自動曲送り (リピート判定連動)
+        targetAudio.addEventListener('ended', () => {
+          playNextTrack(true);
+        });
 
-      audio.addEventListener('play', () => updatePlayPauseUI(true));
-      audio.addEventListener('pause', () => updatePlayPauseUI(false));
+        targetAudio.addEventListener('play', () => {
+          updatePlayPauseUI(true);
+          startVisualizer();
+        });
+        targetAudio.addEventListener('pause', () => updatePlayPauseUI(false));
+      }
+
+      // 初回オーディオ要素へのイベント登録
+      attachAudioEventListeners(audio);
 
       // ==========================================================================
       // レジューム再生 & スリープ・リロード対策
@@ -2864,10 +3061,22 @@
         }
       }
 
-      // visibilitychange / beforeunload で確実に保存
+      // visibilitychange / beforeunload で確実に保存 & バックグラウンド省電力化
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           savePlaybackState();
+          // スリープ・バックグラウンド移行時は描画ループを停止してCPU負荷を完全にカット
+          if (visualizerAnimId) {
+            cancelAnimationFrame(visualizerAnimId);
+            visualizerAnimId = null;
+          }
+        } else {
+          // フォアグラウンド復帰時はビジュアライザー描画を再開
+          startVisualizer();
+          // リアルスペアナモードでAudioContextがiOSの省電力等で中断されている場合は自動再開
+          if (audioMode === 'real' && audioCtx && audioCtx.state === 'suspended' && !audio.paused) {
+            audioCtx.resume().catch(() => {});
+          }
         }
       });
       window.addEventListener('beforeunload', () => {
@@ -2971,6 +3180,8 @@
       }
 
       // --- 起動時初期化 ---
+      updateAudioModeUI();
+      startVisualizer();
       checkResumeState();
 
     })();
