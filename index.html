@@ -124,6 +124,19 @@
       fill: var(--wood-shadow);
     }
 
+    .version-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--wood-shadow);
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(159, 113, 62, 0.35);
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.04em;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      user-select: none;
+    }
+
     /* タブ切り替えボタンバー */
     .tab-nav {
       display: flex;
@@ -1286,11 +1299,13 @@
           MokuPlay
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
-          <!-- 💾 アプリ保存ボタン (完全オフライン起動用) -->
+          <div class="version-badge" title="MokuPlay Version">v1.0.0</div>
+          <!-- 【有料版向け機能】完全オフライン起動用アプリ保存ボタン (開放時にコメント解除)
           <button id="btn-save-app" class="wood-btn btn-save-app" type="button" title="完全オフライン起動用として、このアプリ(HTML)自身を端末にダウンロード保存します">
             <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
             <span>💾 アプリ保存</span>
           </button>
+          -->
         </div>
       </div>
 
@@ -1356,9 +1371,11 @@
                 ファイルで選択 (クラウド対応)
               </label>
             </div>
+            <!-- 【有料版向け機能】
             <div style="margin-top: 14px; font-size: 0.76rem; color: var(--wood-dark); opacity: 0.85;">
               ✈️ 機内モード等で完全オフライン再生する場合は、右上の<strong>「💾 アプリ保存」</strong>で本体にダウンロードしてご利用ください。
             </div>
+            -->
           </div>
 
           <ul id="file-list" class="file-list" style="display: none;">
@@ -1494,7 +1511,7 @@
     <audio id="audio-player" preload="metadata"></audio>
   </div>
 
-  <!-- アプリ保存完了・オフライン案内モーダル -->
+  <!-- 【有料版向け機能】アプリ保存完了・オフライン案内モーダル (開放時にコメント解除)
   <div id="save-modal" class="wood-modal-overlay">
     <div class="wood-modal-card">
       <div class="wood-modal-header">
@@ -1522,6 +1539,7 @@
       </div>
     </div>
   </div>
+  -->
 
   <script>
     /* ==========================================================================
@@ -1607,9 +1625,11 @@
       const audioModeIcon = document.getElementById('audio-mode-icon');
       const audioModeText = document.getElementById('audio-mode-text');
 
+      /* 【有料版向け機能】
       const btnSaveApp = document.getElementById('btn-save-app');
       const saveModal = document.getElementById('save-modal');
       const btnSaveModalClose = document.getElementById('btn-save-modal-close');
+      */
 
       // --- アプリ状態 ---
       // 仮想ファイルシステム: Map<relativePath, { name, path, isDir, fileObj, parentPath }>
@@ -3343,9 +3363,10 @@
         } catch (e) {}
       }
 
-      // ==========================================================================
-      // アプリ自身 (単一HTML) の端末ダウンロード保存 (完全オフライン起動用)
-      // ==========================================================================
+      /* ==========================================================================
+         【有料版向け機能】アプリ自身 (単一HTML) の端末ダウンロード保存 (完全オフライン起動用)
+         ※ 購入者限定で開放する際は前後のコメントアウト(/* と * /)を解除してください
+         ==========================================================================
       function downloadSelfApp() {
         try {
           // 現在のDOMをクローンして一時的なセッション状態（Blob URLなど）をクリーンアップ
@@ -3426,6 +3447,7 @@
           }
         });
       }
+      ========================================================================== */
 
       // --- 起動時初期化 ---
       updateAudioModeUI();
