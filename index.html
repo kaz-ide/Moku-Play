@@ -979,34 +979,40 @@
     }
 
     /* ==========================================================================
-       PC / ワイド画面（16:9等、横幅860px以上）向け 2画面並列レイアウト
+       横向き（ランドスケープ）、または画面幅700px以上向け 左右2カラム並列レイアウト
        ========================================================================== */
-    @media (min-width: 860px) {
+    @media screen and (orientation: landscape), screen and (min-width: 700px) {
       body {
-        padding: 10px;
+        padding: 0;
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
         overflow-y: hidden;
       }
 
       #app-container {
-        max-width: 1800px;
+        max-width: 100%;
         width: 100%;
-        height: calc(100vh - 20px);
-        height: calc(100dvh - 20px);
-        border-radius: 16px;
-        border: 2px solid var(--wood-border);
-        box-shadow: 0 10px 30px rgba(80, 50, 20, 0.35);
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
       }
 
-      /* ワイド画面では両画面を常時並列表示するためタブセレクタは非表示 */
+      /* 2画面並列表示時は上部タブナビゲーションと下部ミニバーを非表示（画面を最大活用） */
       .tab-nav {
-        display: none;
+        display: none !important;
+      }
+
+      #minibar {
+        display: none !important;
       }
 
       main {
         display: flex;
         flex-direction: row;
-        gap: 16px;
-        padding: 10px 16px 10px 16px;
+        gap: 10px;
+        padding: 6px 12px 6px 12px;
         overflow: hidden;
         margin-bottom: 0;
         flex: 1;
@@ -1022,27 +1028,28 @@
         border: 1.5px solid rgba(184, 138, 85, 0.45);
         background: rgba(255, 250, 243, 0.7);
         box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.12);
-        padding: 10px 14px;
+        padding: 8px 12px;
         overflow-y: auto;
       }
 
-      /* 1. 左カラム（選曲リスト）: 幅を360pxに固定（ウィンドウが広がっても不必要に広がらない） */
+      /* 1. 左カラム（選曲リスト）: 横幅比率 clamp(280px, 34vw, 360px) で固定と柔軟性を両立 */
       #view-list {
-        width: 360px;
-        min-width: 340px;
-        max-width: 400px;
-        flex: 0 0 360px;
+        width: clamp(280px, 34vw, 360px);
+        flex: 0 0 clamp(280px, 34vw, 360px);
+        min-width: 260px;
+        max-width: 380px;
         flex-shrink: 0;
       }
 
-      /* 2. 右カラム（再生中プレイヤー）: 横の余ったスペースをすべて使って大きく広がる */
+      /* 2. 右カラム（再生中プレイヤー）: 残りのスペースをすべて使って大きく広がる */
       #view-player {
         flex: 1;
         min-width: 0;
         display: flex !important;
         flex-direction: column;
         align-items: center;
-        padding: 10px 20px;
+        padding: 6px 16px;
+        overflow-y: auto;
       }
 
       .player-container {
@@ -1050,24 +1057,24 @@
         max-width: 960px;
         height: 100%;
         margin: 0 auto;
-        padding-bottom: 6px;
-        gap: 10px;
+        padding-bottom: 4px;
+        gap: 8px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: space-evenly;
       }
 
-      /* 3. ジャケット画像: 縦横比1:1維持、画面高さ52vhに合わせてド迫力に拡大（縦はみ出し防止） */
+      /* 3. ジャケット画像: 縦横比1:1維持、縦はみ出し防止 */
       .artwork-wrapper {
         width: 100%;
         height: auto;
         aspect-ratio: 1 / 1;
-        max-height: 52vh;
-        max-width: min(52vh, 600px);
-        margin: 0 auto 6px auto;
+        max-height: 48vh;
+        max-width: min(48vh, 520px);
+        margin: 0 auto 4px auto;
         flex-shrink: 1;
-        box-shadow: 0 10px 28px rgba(60, 36, 12, 0.45), inset 0 0 0 2px var(--wood-border);
+        box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
       }
 
       #artwork-img {
@@ -1075,14 +1082,208 @@
       }
 
       .artwork-touch-zone svg {
-        width: 44px;
-        height: 44px;
+        width: 40px;
+        height: 40px;
       }
 
       /* 曲情報表示のワイド化 */
       .player-track-info {
         width: 100%;
         max-width: min(840px, 96%);
+      }
+
+      .player-title {
+        font-size: 1.25rem;
+        margin-bottom: 2px;
+      }
+
+      .player-folder {
+        font-size: 0.9rem;
+      }
+
+      /* スペアナ（Canvas）のワイド化 */
+      .visualizer-box {
+        width: 100%;
+        max-width: min(840px, 96%);
+        height: 48px;
+      }
+
+      /* シークバーのワイド化 */
+      .progress-section {
+        width: 100%;
+        max-width: min(840px, 96%);
+        gap: 4px;
+      }
+
+      .time-labels {
+        font-size: 0.82rem;
+      }
+
+      /* コントロールボタン群のワイド配置 */
+      .control-buttons-row {
+        width: 100%;
+        max-width: min(600px, 90%);
+        gap: 12px;
+        margin: 2px 0;
+      }
+
+      .btn-main-play {
+        width: 58px;
+        height: 58px;
+      }
+
+      .btn-main-play svg {
+        width: 28px;
+        height: 28px;
+      }
+
+      .btn-sub-ctrl {
+        width: 44px;
+        height: 44px;
+      }
+
+      .btn-sub-ctrl svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* 音量スライダーのワイド化 */
+      .volume-row {
+        width: 100%;
+        max-width: min(400px, 75%);
+        gap: 10px;
+      }
+    }
+
+    /* ==========================================================================
+       iPhone / スマホ横画面（高さ500px以下のコンパクトな画面）専用の最適化
+       縦スクロール不要で1画面に完璧に収まるよう各余白・サイズを微調整
+       ========================================================================== */
+    @media screen and (orientation: landscape) and (max-height: 500px) {
+      header {
+        padding: 3px 10px;
+        gap: 2px;
+      }
+
+      .brand-title {
+        font-size: 0.95rem;
+      }
+
+      main {
+        gap: 8px;
+        padding: 4px 8px;
+      }
+
+      .screen-view {
+        padding: 6px 8px;
+        border-radius: 8px;
+      }
+
+      .compact-toolbar {
+        height: 36px;
+        margin-bottom: 4px;
+      }
+
+      .compact-toolbar .wood-btn {
+        min-height: 34px;
+        height: 34px;
+        min-width: 34px;
+        padding: 2px 6px;
+      }
+
+      .file-item {
+        min-height: 38px;
+        padding: 4px 8px;
+      }
+
+      .player-container {
+        gap: 3px;
+        padding-bottom: 2px;
+      }
+
+      .artwork-wrapper {
+        max-height: min(40vh, 170px);
+        max-width: min(40vh, 170px);
+        margin: 0 auto 2px auto;
+      }
+
+      .player-track-info {
+        padding: 0;
+      }
+
+      .player-title {
+        font-size: 1.05rem;
+        margin-bottom: 0px;
+      }
+
+      .player-folder {
+        font-size: 0.78rem;
+      }
+
+      .visualizer-box {
+        height: 34px;
+        margin: 1px 0;
+      }
+
+      .progress-section {
+        gap: 2px;
+      }
+
+      .control-buttons-row {
+        gap: 8px;
+        margin: 1px 0;
+      }
+
+      .btn-main-play {
+        width: 46px;
+        height: 46px;
+      }
+
+      .btn-main-play svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .btn-sub-ctrl {
+        width: 36px;
+        height: 36px;
+      }
+
+      .btn-sub-ctrl svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      .volume-row {
+        max-width: min(280px, 80%);
+        gap: 6px;
+      }
+    }
+
+    /* ==========================================================================
+       PC・大画面（幅860px以上 かつ 高さ501px以上）のゆったりした装飾スタイル
+       ========================================================================== */
+    @media screen and (min-width: 860px) and (min-height: 501px) {
+      body {
+        padding: 10px;
+      }
+
+      #app-container {
+        max-width: 1800px;
+        height: calc(100vh - 20px);
+        height: calc(100dvh - 20px);
+        border-radius: 16px;
+        border: 2px solid var(--wood-border);
+        box-shadow: 0 10px 30px rgba(80, 50, 20, 0.35);
+      }
+
+      .screen-view {
+        padding: 10px 14px;
+      }
+
+      .artwork-wrapper {
+        max-height: 52vh;
+        max-width: min(52vh, 600px);
       }
 
       .player-title {
@@ -1094,30 +1295,8 @@
         font-size: 0.95rem;
       }
 
-      /* スペアナ（Canvas）のワイド化 */
       .visualizer-box {
-        width: 100%;
-        max-width: min(840px, 96%);
         height: 54px;
-      }
-
-      /* シークバーのワイド化 */
-      .progress-section {
-        width: 100%;
-        max-width: min(840px, 96%);
-        gap: 6px;
-      }
-
-      .time-labels {
-        font-size: 0.85rem;
-      }
-
-      /* コントロールボタン群のワイド配置 */
-      .control-buttons-row {
-        width: 100%;
-        max-width: min(640px, 90%);
-        gap: 14px;
-        margin: 4px 0;
       }
 
       .btn-main-play {
@@ -1138,27 +1317,6 @@
       .btn-sub-ctrl svg {
         width: 22px;
         height: 22px;
-      }
-
-      /* 音量スライダーのワイド化 */
-      .volume-row {
-        width: 100%;
-        max-width: min(440px, 75%);
-        gap: 12px;
-      }
-
-      /* ミニバーをアプリ下部に自然に配置 */
-      #minibar {
-        position: relative;
-        left: auto;
-        bottom: auto;
-        transform: none;
-        width: 100%;
-        max-width: 100%;
-        margin-top: auto;
-        flex-shrink: 0;
-        border-bottom-left-radius: 14px;
-        border-bottom-right-radius: 14px;
       }
     }
 
