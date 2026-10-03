@@ -203,6 +203,9 @@
       box-shadow: 0 3px 5px rgba(102, 67, 30, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
       transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
       touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .wood-btn:active:not(:disabled) {
@@ -1161,8 +1164,8 @@
             <span class="crumb-item" data-path="">🏠 /</span>
           </div>
 
-          <!-- フォルダ追加/変更ボタン (明示的タップ用: PC / このiPhone内) -->
-          <label for="folder-picker-input" class="wood-btn" style="cursor: pointer;" title="フォルダを選択（PC / このiPhone内）">
+          <!-- フォルダ追加/変更ボタン (明示的タップ用: PC / スマホ本体内) -->
+          <label for="folder-picker-input" class="wood-btn" style="cursor: pointer;" title="フォルダを選択（PC / スマホ本体内）">
             <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
           </label>
 
@@ -1177,15 +1180,15 @@
           <div id="empty-state" class="empty-state">
             <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12 9l-4 4h3v4h2v-4h3l-4-4z"/></svg>
             <h3>音楽フォルダまたはファイルを選択</h3>
-            <p>スマホやPC内の音楽を選択してください。<br>※ iPhoneでGoogle DriveやOneDrive内の曲を選ぶ場合は<strong>「ファイルで選択」</strong>を使用してください（iOSの仕様）。</p>
+            <p>スマホやPC内の音楽を選択してください。<br>※ Google Drive や OneDrive などのクラウド内の曲を選ぶ場合は、スマートフォン共通の仕様により<strong>「ファイルで選択」</strong>をご利用ください。</p>
             <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-              <label for="folder-picker-input" class="wood-btn" style="padding: 10px 16px;" title="PCやiPhone本体内のフォルダを選択">
+              <label for="folder-picker-input" class="wood-btn" style="padding: 10px 16px;" title="PCやスマホ本体内のフォルダを選択">
                 <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 フォルダを選択
               </label>
               <label for="files-picker-input" class="wood-btn" style="padding: 10px 14px; opacity: 0.9;" title="Google Drive / OneDriveなどのクラウドや単曲用">
                 <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                ファイルで選択 (Google/OneDrive対応)
+                ファイルで選択 (クラウド対応)
               </label>
             </div>
           </div>
@@ -2447,31 +2450,49 @@
           isLongPressed = true;
           // バイブレーション (対応端末のみ)
           if (navigator.vibrate) navigator.vibrate(50);
-          showToast('フォルダ選択ダイアログを開きます');
-          triggerFolderDialog();
-          resetLongPress();
+          showToast('長押し検知：指を離すとフォルダ選択を開きます');
         }, LONG_PRESS_DURATION);
       }
 
-      function resetLongPress() {
+      function endLongPress(e) {
         clearTimeout(longPressTimer);
         homeLongPressBar.style.transition = 'width 0.15s ease';
         homeLongPressBar.style.width = '0%';
-      }
 
-      // ポインターイベント対応
-      btnHome.addEventListener('pointerdown', startLongPress);
-      btnHome.addEventListener('pointerup', (e) => {
-        if (!isLongPressed) {
+        if (isLongPressed) {
+          isLongPressed = false;
+          // ユーザーの指離し操作（直接のユーザー操作イベント）の中でダイアログを起動
+          // これによりiOS Safari等の非同期ポップアップブロックを完全に回避
+          triggerFolderDialog();
+        } else {
           // 通常タップ: ルートへジャンプ
           currentPath = '';
           localStorage.setItem(STORAGE_KEY_FOLDER, '');
           renderList();
         }
-        resetLongPress();
+      }
+
+      function cancelLongPress() {
+        clearTimeout(longPressTimer);
+        isLongPressed = false;
+        homeLongPressBar.style.transition = 'width 0.15s ease';
+        homeLongPressBar.style.width = '0%';
+      }
+
+      // ポインターイベント対応（iOS Safariのイベントロスト防止にPointerCaptureを活用）
+      btnHome.addEventListener('pointerdown', (e) => {
+        try { btnHome.setPointerCapture(e.pointerId); } catch (_) {}
+        startLongPress(e);
       });
-      btnHome.addEventListener('pointercancel', resetLongPress);
-      btnHome.addEventListener('pointerleave', resetLongPress);
+      btnHome.addEventListener('pointerup', (e) => {
+        try { btnHome.releasePointerCapture(e.pointerId); } catch (_) {}
+        endLongPress(e);
+      });
+      btnHome.addEventListener('pointercancel', (e) => {
+        try { btnHome.releasePointerCapture(e.pointerId); } catch (_) {}
+        cancelLongPress();
+      });
+      btnHome.addEventListener('contextmenu', (e) => e.preventDefault());
 
       // 1階層上へボタン
       btnUp.addEventListener('click', () => {
