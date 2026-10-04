@@ -95,16 +95,18 @@
       border-bottom: 2px solid var(--wood-border);
       padding: 6px 10px 4px 10px;
       display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
       gap: 5px;
       box-shadow: 0 2px 4px rgba(102, 67, 30, 0.15);
       z-index: 20;
     }
 
-    .brand-bar {
+    .header-left {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      order: 1;
     }
 
     .brand-title {
@@ -124,6 +126,13 @@
       fill: var(--wood-shadow);
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      order: 2;
+    }
+
     .version-badge {
       font-size: 0.72rem;
       font-weight: 700;
@@ -140,6 +149,8 @@
     /* タブ切り替えボタンバー */
     .tab-nav {
       display: flex;
+      width: 100%;
+      order: 3;
       background: rgba(159, 113, 62, 0.22);
       padding: 2px;
       border-radius: 10px;
@@ -479,11 +490,47 @@
       padding-bottom: 8px;
     }
 
-    /* ジャケット表示エリア (画面横幅95% ド迫力表示) */
+    /* 縦画面時は左右ペインを透明化し、従来の並び順を完全維持 */
+    .player-left-pane,
+    .player-right-pane {
+      display: contents;
+    }
+
+    .player-track-info {
+      order: 1;
+    }
+
+    .artwork-wrapper {
+      order: 2;
+    }
+
+    .visualizer-box {
+      order: 3;
+    }
+
+    .progress-section {
+      order: 4;
+    }
+
+    .control-buttons-row {
+      order: 5;
+    }
+
+    .volume-row {
+      order: 6;
+    }
+
+    /* ジャケット表示エリア (正方形1:1を完全維持したまま画面内で最大化) */
     .artwork-wrapper {
       position: relative;
-      width: 95%;
-      max-width: 95vw;
+      /* 画面の横幅と縦の残り高さの両方を考慮し、小さい方を正方形の1辺として採用 */
+      --art-size: clamp(160px, min(92vw, calc(100dvh - 350px), calc(100vh - 350px), 440px), 440px);
+      width: var(--art-size);
+      height: var(--art-size);
+      min-width: var(--art-size);
+      min-height: var(--art-size);
+      max-width: var(--art-size);
+      max-height: var(--art-size);
       aspect-ratio: 1 / 1;
       margin: 4px auto 6px auto;
       border-radius: 16px;
@@ -497,15 +544,17 @@
       cursor: pointer;
       overflow: hidden;
       flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     /* 抽出された埋め込みジャケット画像 */
     #artwork-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+      width: 100% !important;
+      height: 100% !important;
+      aspect-ratio: 1 / 1 !important;
+      object-fit: cover !important;
       display: none;
-      border-radius: 14px;
+      border-radius: inherit;
     }
 
     /* レコード盤デザイン */
@@ -979,9 +1028,12 @@
     }
 
     /* ==========================================================================
-       横向き（ランドスケープ）、または画面幅700px以上向け 左右2カラム並列レイアウト
+       横向き（ランドスケープ）表示:
+       ・2画面同時表示は廃止し、選曲画面と再生中画面の切り替え式
+       ・再生中画面は左半分にジャケット画像を最大表示、右半分にその他の項目
+       ・曲名やアーティスト名を大きく表示
        ========================================================================== */
-    @media screen and (orientation: landscape), screen and (min-width: 700px) {
+    @media screen and (orientation: landscape) {
       body {
         padding: 0;
         padding-left: env(safe-area-inset-left, 0px);
@@ -999,184 +1051,129 @@
         box-shadow: none;
       }
 
-      /* 2画面並列表示時は上部タブナビゲーションと下部ミニバーを非表示（画面を最大活用） */
-      .tab-nav {
-        display: none !important;
-      }
-
-      #minibar {
-        display: none !important;
-      }
-
-      main {
-        display: flex;
-        flex-direction: row;
-        gap: 10px;
-        padding: 6px 12px 6px 12px;
-        overflow: hidden;
-        margin-bottom: 0;
-        flex: 1;
-        min-height: 0;
-      }
-
-      /* 選曲画面と再生中画面を左右2列で同時に並列表示 */
-      .screen-view {
-        position: relative;
+      /* ヘッダー: 左にブランド名、中央に選曲/再生中ボタン、右にバージョン番号を1行で配置 */
+      header {
         display: flex !important;
-        height: 100%;
-        border-radius: 12px;
-        border: 1.5px solid rgba(184, 138, 85, 0.45);
-        background: rgba(255, 250, 243, 0.7);
-        box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.12);
-        padding: 8px 12px;
-        overflow-y: auto;
-      }
-
-      /* 1. 左カラム（選曲リスト）: 横幅比率 clamp(280px, 34vw, 360px) で固定と柔軟性を両立 */
-      #view-list {
-        width: clamp(280px, 34vw, 360px);
-        flex: 0 0 clamp(280px, 34vw, 360px);
-        min-width: 260px;
-        max-width: 380px;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 2px 14px;
+        min-height: 38px;
+        gap: 12px;
         flex-shrink: 0;
       }
 
-      /* 2. 右カラム（再生中プレイヤー）: 残りのスペースをすべて使って大きく広がる */
-      #view-player {
-        flex: 1;
-        min-width: 0;
+      .header-left {
+        flex: 0 0 auto !important;
         display: flex !important;
-        flex-direction: column;
-        align-items: center;
-        padding: 6px 16px;
-        overflow-y: auto;
-      }
-
-      .player-container {
-        width: 100%;
-        max-width: 960px;
-        height: 100%;
-        margin: 0 auto;
-        padding-bottom: 4px;
-        gap: 8px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: space-evenly;
-      }
-
-      /* 3. ジャケット画像: 縦横比1:1維持、縦はみ出し防止 */
-      .artwork-wrapper {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 1 / 1;
-        max-height: 45vh;
-        max-width: min(45vh, 480px);
-        margin: 0 auto 4px auto;
-        flex-shrink: 1;
-        box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
-      }
-
-      #artwork-img {
-        object-fit: contain;
-      }
-
-      .artwork-touch-zone svg {
-        width: 40px;
-        height: 40px;
-      }
-
-      /* 曲情報表示のワイド化 */
-      .player-track-info {
-        width: 100%;
-        max-width: min(840px, 96%);
-      }
-
-      .player-title {
-        font-size: 1.25rem;
-        margin-bottom: 2px;
-      }
-
-      .player-folder {
-        font-size: 0.9rem;
-      }
-
-      /* スペアナ（Canvas）のワイド化 */
-      .visualizer-box {
-        width: 100%;
-        max-width: min(840px, 96%);
-        height: 48px;
-      }
-
-      /* シークバーのワイド化 */
-      .progress-section {
-        width: 100%;
-        max-width: min(840px, 96%);
-        gap: 4px;
-      }
-
-      .time-labels {
-        font-size: 0.82rem;
-      }
-
-      /* コントロールボタン群のワイド配置 */
-      .control-buttons-row {
-        width: 100%;
-        max-width: min(600px, 90%);
-        gap: 12px;
-        margin: 2px 0;
-      }
-
-      .btn-main-play {
-        width: 58px;
-        height: 58px;
-      }
-
-      .btn-main-play svg {
-        width: 28px;
-        height: 28px;
-      }
-
-      .btn-sub-ctrl {
-        width: 44px;
-        height: 44px;
-      }
-
-      .btn-sub-ctrl svg {
-        width: 20px;
-        height: 20px;
-      }
-
-      /* 音量スライダーのワイド化 */
-      .volume-row {
-        width: 100%;
-        max-width: min(400px, 75%);
-        gap: 10px;
-      }
-    }
-
-    /* ==========================================================================
-       iPhone / スマホ横画面（高さ500px以下のコンパクトな画面）専用の最適化
-       縦スクロール不要で1画面に完璧に収まるよう各余白・サイズを微調整
-       ========================================================================== */
-    @media screen and (orientation: landscape) and (max-height: 500px) {
-      header {
-        padding: 3px 10px;
-        gap: 2px;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        order: 1 !important;
       }
 
       .brand-title {
         font-size: 0.95rem;
+        white-space: nowrap;
       }
 
-      main {
+      .tab-nav {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        max-width: 900px !important;
+        margin: 0 auto !important;
+        order: 2 !important;
+        display: flex !important;
         gap: 8px;
-        padding: 4px 8px;
+        padding: 2px 4px;
+      }
+
+      .tab-btn {
+        flex: 1 1 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 32px;
+        height: 32px;
+        padding: 0 16px;
+        font-size: 0.92rem;
+        font-weight: 800;
+        gap: 8px;
+        letter-spacing: 0.04em;
+      }
+
+      .tab-btn svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+
+      .header-right {
+        flex: 0 0 auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        order: 3 !important;
+        gap: 6px;
+      }
+
+      .version-badge {
+        font-size: 0.72rem;
+        display: inline-block !important;
+      }
+
+      /* メインコンテンツ: 1画面ずつ単独表示（切り替え式） */
+      main {
+        display: block;
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+        padding: 0;
+        margin-bottom: var(--minibar-height);
+        min-height: 0;
+      }
+
+      /* 再生中画面表示時は、ミニバーを非表示にして全画面の縦領域をプレイヤーに提供 */
+      body.is-view-player main {
+        margin-bottom: 0 !important;
+      }
+
+      body.is-view-player #minibar {
+        display: none !important;
+      }
+
+      /* 選曲画面表示時は、下部ミニバーをコンパクトに常駐 */
+      body.is-view-list #minibar {
+        height: 52px;
+        padding: 0 14px;
+        max-width: 100%;
+      }
+
+      body.is-view-list main {
+        margin-bottom: 52px;
       }
 
       .screen-view {
-        padding: 6px 8px;
-        border-radius: 8px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        display: none;
+        padding: 4px 12px 8px 12px;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .screen-view.active {
+        display: flex;
+      }
+
+      /* 選曲画面 (横画面時) */
+      #view-list {
+        padding: 4px 16px 8px 16px;
+        max-width: 1200px;
+        margin: 0 auto;
       }
 
       .compact-toolbar {
@@ -1184,268 +1181,243 @@
         margin-bottom: 4px;
       }
 
-      .compact-toolbar .wood-btn {
-        min-height: 34px;
-        height: 34px;
-        min-width: 34px;
-        padding: 2px 6px;
+      .file-item {
+        min-height: 42px;
+        padding: 4px 10px;
       }
 
-      .file-item {
-        min-height: 38px;
-        padding: 4px 8px;
+      /* ==========================================================================
+         再生中画面 (横画面時): 左右2分割レイアウト
+         ・左半分: ジャケット画像（正方形を維持したまま最大限に表示）
+         ・右半分: 曲情報（拡大）、スペアナ、シークバー、操作ボタン、音量
+         ========================================================================== */
+      #view-player {
+        padding: 2px 14px 4px 14px;
+        overflow-y: hidden;
       }
 
       .player-container {
-        gap: 3px;
-        padding-bottom: 2px;
-      }
-
-      .artwork-wrapper {
-        max-height: min(40vh, 170px);
-        max-width: min(40vh, 170px);
-        margin: 0 auto 2px auto;
-      }
-
-      .player-track-info {
-        padding: 0;
-      }
-
-      .player-title {
-        font-size: 1.05rem;
-        margin-bottom: 0px;
-      }
-
-      .player-folder {
-        font-size: 0.78rem;
-      }
-
-      .visualizer-box {
-        height: 34px;
-        margin: 1px 0;
-      }
-
-      .progress-section {
-        gap: 2px;
-      }
-
-      .control-buttons-row {
-        gap: 8px;
-        margin: 1px 0;
-      }
-
-      .btn-main-play {
-        width: 46px;
-        height: 46px;
-      }
-
-      .btn-main-play svg {
-        width: 22px;
-        height: 22px;
-      }
-
-      .btn-sub-ctrl {
-        width: 36px;
-        height: 36px;
-      }
-
-      .btn-sub-ctrl svg {
-        width: 17px;
-        height: 17px;
-      }
-
-      .volume-row {
-        max-width: min(280px, 80%);
-        gap: 6px;
-      }
-    }
-
-    /* ==========================================================================
-       PC・大画面（幅860px以上 かつ 高さ501px以上）のゆったりした装飾スタイル
-       ========================================================================== */
-    @media screen and (min-width: 860px) and (min-height: 501px) {
-      body {
-        padding: 10px;
-      }
-
-      #app-container {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 100%;
+        width: 100%;
         max-width: 1800px;
-        height: calc(100vh - 20px);
-        height: calc(100dvh - 20px);
-        border-radius: 16px;
+        margin: 0 auto;
+        gap: 16px;
+        box-sizing: border-box;
+      }
+
+      /* 左半分: ジャケット画像エリア (縦横比1:1の正方形を完全維持したまま最大化) */
+      .player-left-pane {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        height: 100% !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+
+      .player-left-pane .artwork-wrapper {
+        order: unset !important;
+        /* 高さ制限と幅制限の最小値を単一サイズとして計算し、縦横すべてに同一値を適用して絶対正方形化。PC大画面時は1000px超まで伸びやかに拡大 */
+        --art-land-size: min(calc(100dvh - 44px), calc(100vh - 44px), calc(100vw - 440px), 52vw, 1100px);
+        width: var(--art-land-size) !important;
+        height: var(--art-land-size) !important;
+        min-width: var(--art-land-size) !important;
+        min-height: var(--art-land-size) !important;
+        max-width: var(--art-land-size) !important;
+        max-height: var(--art-land-size) !important;
+        aspect-ratio: 1 / 1 !important;
+        margin: auto !important;
+        border-radius: 14px !important;
         border: 2px solid var(--wood-border);
-        box-shadow: 0 10px 30px rgba(80, 50, 20, 0.35);
+        box-shadow: 0 8px 24px rgba(60, 36, 12, 0.45), inset 0 0 0 2px var(--wood-border);
+        flex-shrink: 0 !important;
+        box-sizing: border-box !important;
       }
 
-      .screen-view {
-        padding: 10px 14px;
+      .player-left-pane #artwork-img {
+        width: 100% !important;
+        height: 100% !important;
+        aspect-ratio: 1 / 1 !important;
+        object-fit: cover !important;
+        border-radius: 12px;
       }
 
-      .artwork-wrapper {
-        max-height: 52vh;
-        max-width: min(52vh, 600px);
+      .player-left-pane .vinyl-disc {
+        width: 100% !important;
+        height: 100% !important;
+        aspect-ratio: 1 / 1 !important;
+        border-radius: 50% !important;
       }
 
-      .player-title {
-        font-size: 1.35rem;
-        margin-bottom: 4px;
+      /* 右半分: その他の項目エリア */
+      .player-right-pane {
+        display: flex !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        flex-direction: column !important;
+        justify-content: space-evenly !important;
+        align-items: center !important;
+        padding: 2px 8px !important;
+        gap: 4px !important;
+        box-sizing: border-box;
+        overflow-y: auto;
       }
 
-      .player-folder {
-        font-size: 0.95rem;
+      /* 曲名 & アーティスト名 (現在より大きく表示) */
+      .player-right-pane .player-track-info {
+        order: unset !important;
+        width: 100% !important;
+        max-width: 560px !important;
+        text-align: center !important;
+        padding: 0 4px !important;
+        flex-shrink: 0;
       }
 
-      .visualizer-box {
-        height: 54px;
+      .player-right-pane .player-title {
+        font-size: clamp(1.3rem, 3.4vw, 1.75rem) !important;
+        font-weight: 800 !important;
+        color: var(--wood-shadow) !important;
+        line-height: 1.25 !important;
+        margin-bottom: 2px !important;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
       }
 
-      .btn-main-play {
-        width: 64px;
-        height: 64px;
+      .player-right-pane .player-folder {
+        font-size: clamp(0.98rem, 2.3vw, 1.25rem) !important;
+        font-weight: 600 !important;
+        color: var(--text-muted) !important;
       }
 
-      .btn-main-play svg {
-        width: 30px;
-        height: 30px;
+      /* スペアナ (横画面時はこれまでの約3倍の高さ 114px に拡大) */
+      .player-right-pane .visualizer-box {
+        order: unset !important;
+        width: 100% !important;
+        max-width: 520px !important;
+        height: 114px !important;
+        flex-shrink: 0;
       }
 
-      .btn-sub-ctrl {
-        width: 46px;
-        height: 46px;
+      /* シークバー & 時間 */
+      .player-right-pane .progress-section {
+        order: unset !important;
+        width: 100% !important;
+        max-width: 500px !important;
+        gap: 2px !important;
+        flex-shrink: 0;
       }
 
-      .btn-sub-ctrl svg {
-        width: 22px;
-        height: 22px;
+      .player-right-pane .time-labels {
+        font-size: 0.82rem;
+      }
+
+      /* コントロールボタン群 */
+      .player-right-pane .control-buttons-row {
+        order: unset !important;
+        width: 100% !important;
+        max-width: 480px !important;
+        gap: 10px !important;
+        margin: 2px 0 !important;
+        flex-shrink: 0;
+      }
+
+      .player-right-pane .btn-main-play {
+        width: 54px !important;
+        height: 54px !important;
+      }
+
+      .player-right-pane .btn-main-play svg {
+        width: 26px !important;
+        height: 26px !important;
+      }
+
+      .player-right-pane .btn-sub-ctrl {
+        width: 40px !important;
+        height: 40px !important;
+      }
+
+      .player-right-pane .btn-sub-ctrl svg {
+        width: 19px !important;
+        height: 19px !important;
+      }
+
+      /* 音量スライダー */
+      .player-right-pane .volume-row {
+        order: unset !important;
+        width: 100% !important;
+        max-width: 400px !important;
+        gap: 8px !important;
+        flex-shrink: 0;
       }
     }
 
-    /* 手動レイアウト切替ボタン (ヘッダー右上) */
-    .btn-layout-toggle {
-      min-height: 26px;
-      height: 26px;
-      padding: 0 8px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      border-radius: 6px;
-      gap: 3px;
-      background: linear-gradient(to bottom, #fffaf2 0%, #ebd4b8 60%, #dfbc94 100%);
-      color: var(--wood-shadow);
-      border: 1px solid rgba(159, 113, 62, 0.45);
-      box-shadow: 0 1px 3px rgba(102, 67, 30, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.15s ease;
-      display: inline-flex;
-      align-items: center;
-    }
-    .btn-layout-toggle:hover {
-      filter: brightness(1.05);
-      border-color: var(--amber-glow);
-    }
-    .btn-layout-toggle.active {
-      background: linear-gradient(to bottom, #dfbc94 0%, #caa06d 100%);
-      color: #381f08;
-      box-shadow: inset 0 1px 3px rgba(80, 45, 15, 0.4);
-      border-color: #9f713e;
-    }
+    /* 超小型横画面スマホ (高さ420px以下) のための微調整 */
+    @media screen and (orientation: landscape) and (max-height: 420px) {
+      header {
+        padding: 2px 8px;
+        min-height: 34px;
+      }
 
-    /* ==========================================================================
-       【手動2画面モード】body.two-column-mode
-       自動判定で2画面にならなかった場合でも強制的に「左: 選曲 / 右: 再生中」を横並び表示
-       ========================================================================== */
-    body.two-column-mode {
-      overflow-y: hidden;
-    }
+      .tab-btn {
+        min-height: 28px;
+        height: 28px;
+        padding: 0 10px;
+        font-size: 0.76rem;
+      }
 
-    body.two-column-mode #app-container {
-      max-width: 100% !important;
-      width: 100% !important;
-      height: 100vh;
-      height: 100dvh;
-      border-radius: 0;
-      border: none;
-      box-shadow: none;
-    }
+      .player-right-pane {
+        gap: 2px !important;
+      }
 
-    /* 上部の「選曲 / 再生中」タブボタン、および下部ミニバーを非表示 */
-    body.two-column-mode .tab-nav,
-    body.two-column-mode #minibar {
-      display: none !important;
-    }
+      .player-right-pane .player-title {
+        font-size: clamp(1.15rem, 3.2vw, 1.45rem) !important;
+      }
 
-    body.two-column-mode main {
-      display: flex !important;
-      flex-direction: row !important;
-      gap: 10px !important;
-      padding: 6px 12px !important;
-      overflow: hidden !important;
-      margin-bottom: 0 !important;
-      flex: 1 !important;
-      min-height: 0 !important;
-    }
+      .player-right-pane .player-folder {
+        font-size: clamp(0.88rem, 2vw, 1.05rem) !important;
+      }
 
-    /* 選曲画面と再生画面の両方を強制表示（タブ切り替えのdisplay:noneを徹底無効化） */
-    body.two-column-mode .screen-view,
-    body.two-column-mode #view-list,
-    body.two-column-mode #view-player,
-    body.two-column-mode #view-now {
-      position: relative !important;
-      display: flex !important;
-      height: 100% !important;
-      border-radius: 12px;
-      border: 1.5px solid rgba(184, 138, 85, 0.45);
-      background: rgba(255, 250, 243, 0.7);
-      box-shadow: inset 0 1px 3px rgba(102, 67, 30, 0.12);
-      padding: 8px 12px;
-      overflow-y: auto;
-    }
+      .player-right-pane .visualizer-box {
+        height: 32px !important;
+      }
 
-    /* 左カラム（リスト）: 幅 320px〜350px 固定 */
-    body.two-column-mode #view-list {
-      width: 330px !important;
-      min-width: 300px !important;
-      max-width: 350px !important;
-      flex: 0 0 330px !important;
-      flex-shrink: 0 !important;
-    }
+      .player-right-pane .btn-main-play {
+        width: 46px !important;
+        height: 46px !important;
+      }
 
-    /* 右カラム（プレイヤー）: 残りの横幅全体 (flex: 1) */
-    body.two-column-mode #view-player,
-    body.two-column-mode #view-now {
-      flex: 1 !important;
-      min-width: 0 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      padding: 6px 16px;
-      overflow-y: auto;
-    }
+      .player-right-pane .btn-main-play svg {
+        width: 22px !important;
+        height: 22px !important;
+      }
 
-    body.two-column-mode .player-container {
-      width: 100%;
-      max-width: 960px;
-      height: 100%;
-      margin: 0 auto;
-      padding-bottom: 4px;
-      gap: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-evenly;
-    }
+      .player-right-pane .btn-sub-ctrl {
+        width: 36px !important;
+        height: 36px !important;
+      }
 
-    /* ジャケット画像の最大高さを 45vh に制限（縦はみ出し防止） */
-    body.two-column-mode .artwork-wrapper {
-      width: 100%;
-      height: auto;
-      aspect-ratio: 1 / 1;
-      max-height: 45vh !important;
-      max-width: min(45vh, 480px) !important;
-      margin: 0 auto 4px auto;
-      flex-shrink: 1;
-      box-shadow: 0 8px 24px rgba(60, 36, 12, 0.4), inset 0 0 0 2px var(--wood-border);
+      .player-right-pane .btn-sub-ctrl svg {
+        width: 17px !important;
+        height: 17px !important;
+      }
+
+      .player-left-pane .artwork-wrapper {
+        --size-small: min(calc(100dvh - 36px), calc(100vh - 36px), 46vw, 420px);
+        width: var(--size-small) !important;
+        height: var(--size-small) !important;
+        min-width: var(--size-small) !important;
+        min-height: var(--size-small) !important;
+        max-width: var(--size-small) !important;
+        max-height: var(--size-small) !important;
+        aspect-ratio: 1 / 1 !important;
+      }
     }
 
     /* アプリ保存ボタン (ヘッダー右上) */
@@ -1578,39 +1550,35 @@
   <div id="app-container">
     <!-- ヘッダー & タブナビゲーション -->
     <header>
-      <div class="brand-bar">
+      <div class="header-left">
         <div class="brand-title">
           <!-- ウッドアコースティック風 音符アイコン -->
           <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
           MokuPlay
         </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <!-- ◫ 手動レイアウト切替ボタン (2画面 / 1画面) -->
-          <button id="btn-toggle-layout" class="wood-btn btn-layout-toggle" type="button" title="画面レイアウト切替（タップで 2画面並列 ◫ / 1画面 ▯ を強制切替）">
-            <span id="layout-toggle-icon">◫</span>
-            <span id="layout-toggle-text">2画面</span>
-          </button>
-          <div class="version-badge" title="MokuPlay Version">v1.1.0</div>
-          <!-- 【有料版向け機能】完全オフライン起動用アプリ保存ボタン (開放時にコメント解除)
-          <button id="btn-save-app" class="wood-btn btn-save-app" type="button" title="完全オフライン起動用として、このアプリ(HTML)自身を端末にダウンロード保存します">
-            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-            <span>💾 アプリ保存</span>
-          </button>
-          -->
-        </div>
       </div>
 
-      <!-- タブバー -->
+      <!-- タブバー (横画面時中央寄せ) -->
       <nav class="tab-nav">
         <button id="tab-list-btn" class="tab-btn active" type="button">
           <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-          選曲 (フォルダ)
+          選曲
         </button>
         <button id="tab-player-btn" class="tab-btn" type="button">
           <svg style="width:18px;height:18px;fill:currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
           再生中
         </button>
       </nav>
+
+      <div class="header-right">
+        <div class="version-badge" title="MokuPlay Version">v1.4.0</div>
+        <!-- 【有料版向け機能】完全オフライン起動用アプリ保存ボタン (開放時にコメント解除)
+        <button id="btn-save-app" class="wood-btn btn-save-app" type="button" title="完全オフライン起動用として、このアプリ(HTML)自身を端末にダウンロード保存します">
+          <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+          <span>💾 アプリ保存</span>
+        </button>
+        -->
+      </div>
     </header>
 
     <!-- メインコンテンツ -->
@@ -1679,88 +1647,93 @@
       <section id="view-player" class="screen-view">
         <div class="player-container">
           
-          <!-- 曲情報 -->
-          <div class="player-track-info">
-            <div id="player-title" class="player-title">曲が選択されていません</div>
-            <div id="player-folder" class="player-folder">フォルダ: -</div>
-          </div>
+          <!-- 左半分: ジャケット画像エリア (横画面時最大表示) -->
+          <div class="player-left-pane">
+            <div id="artwork-area" class="artwork-wrapper" title="左側タップ: 前の曲 / 右側タップ: 次の曲">
+              <!-- 抽出された埋め込みジャケット画像 -->
+              <img id="artwork-img" alt="Album Artwork">
 
-          <!-- ジャケット表示エリア (画面横幅95% ド迫力表示 + 左右タップスキップ) -->
-          <div id="artwork-area" class="artwork-wrapper" title="左側タップ: 前の曲 / 右側タップ: 次の曲">
-            <!-- 抽出された埋め込みジャケット画像 -->
-            <img id="artwork-img" alt="Album Artwork">
+              <!-- レコード盤プレースホルダー (埋め込み画像がない場合に表示) -->
+              <div id="vinyl-disc" class="vinyl-disc">
+                <div class="vinyl-label"></div>
+              </div>
 
-            <!-- レコード盤プレースホルダー (埋め込み画像がない場合に表示) -->
-            <div id="vinyl-disc" class="vinyl-disc">
-              <div class="vinyl-label"></div>
-            </div>
+              <!-- 左側スキップ領域 -->
+              <div class="artwork-touch-zone artwork-touch-left" id="touch-prev" title="前の曲へ">
+                <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+              </div>
 
-            <!-- 左側スキップ領域 -->
-            <div class="artwork-touch-zone artwork-touch-left" id="touch-prev" title="前の曲へ">
-              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-            </div>
-
-            <!-- 右側スキップ領域 -->
-            <div class="artwork-touch-zone artwork-touch-right" id="touch-next" title="次の曲へ">
-              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+              <!-- 右側スキップ領域 -->
+              <div class="artwork-touch-zone artwork-touch-right" id="touch-next" title="次の曲へ">
+                <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+              </div>
             </div>
           </div>
 
-          <!-- スペクトラムアナライザー & 再生モード切替 -->
-          <div class="visualizer-box" id="visualizer-box">
-            <canvas id="visualizer-canvas" width="360" height="48"></canvas>
-            <button id="btn-audio-mode" class="visualizer-mode-btn" type="button" title="再生モード切替 (スリープ再生 / リアルスペアナ)">
-              <span id="audio-mode-icon">🎧</span>
-              <span id="audio-mode-text">スリープ対応</span>
-            </button>
-          </div>
-
-          <!-- シークバー & 時間 -->
-          <div class="progress-section">
-            <input id="seek-slider" class="wood-slider" type="range" min="0" max="100" value="0" step="0.1">
-            <div class="time-labels">
-              <span id="current-time">00:00</span>
-              <span id="total-time">00:00</span>
+          <!-- 右半分: コントロール & 曲情報エリア (横画面時) -->
+          <div class="player-right-pane">
+            <!-- 曲情報 -->
+            <div class="player-track-info">
+              <div id="player-title" class="player-title">曲が選択されていません</div>
+              <div id="player-folder" class="player-folder">フォルダ: -</div>
             </div>
-          </div>
 
-          <!-- コントロール部 -->
-          <div class="control-buttons-row">
-            <!-- シャッフル -->
-            <button id="btn-shuffle" class="wood-btn btn-sub-ctrl" type="button" title="シャッフル切替">
-              <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
-            </button>
+            <!-- スペクトラムアナライザー & 再生モード切替 -->
+            <div class="visualizer-box" id="visualizer-box">
+              <canvas id="visualizer-canvas" width="360" height="48"></canvas>
+              <button id="btn-audio-mode" class="visualizer-mode-btn" type="button" title="再生モード切替 (スリープ再生 / リアルスペアナ)">
+                <span id="audio-mode-icon">🎧</span>
+                <span id="audio-mode-text">スリープ対応</span>
+              </button>
+            </div>
 
-            <!-- 前の曲 -->
-            <button id="btn-prev" class="wood-btn btn-sub-ctrl" type="button" title="前の曲">
-              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-            </button>
+            <!-- シークバー & 時間 -->
+            <div class="progress-section">
+              <input id="seek-slider" class="wood-slider" type="range" min="0" max="100" value="0" step="0.1">
+              <div class="time-labels">
+                <span id="current-time">00:00</span>
+                <span id="total-time">00:00</span>
+              </div>
+            </div>
 
-            <!-- 再生/一時停止 (メインボタン) -->
-            <button id="btn-play-pause" class="wood-btn btn-main-play" type="button" title="再生 / 一時停止">
-              <svg id="main-play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            </button>
+            <!-- コントロール部 -->
+            <div class="control-buttons-row">
+              <!-- シャッフル -->
+              <button id="btn-shuffle" class="wood-btn btn-sub-ctrl" type="button" title="シャッフル切替">
+                <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+              </button>
 
-            <!-- 停止 -->
-            <button id="btn-stop" class="wood-btn btn-sub-ctrl" type="button" title="停止">
-              <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-            </button>
+              <!-- 前の曲 -->
+              <button id="btn-prev" class="wood-btn btn-sub-ctrl" type="button" title="前の曲">
+                <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+              </button>
 
-            <!-- 次の曲 -->
-            <button id="btn-next" class="wood-btn btn-sub-ctrl" type="button" title="次の曲">
-              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-            </button>
+              <!-- 再生/一時停止 (メインボタン) -->
+              <button id="btn-play-pause" class="wood-btn btn-main-play" type="button" title="再生 / 一時停止">
+                <svg id="main-play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
 
-            <!-- リピート（初期有効: フォルダ内ループ） -->
-            <button id="btn-repeat" class="wood-btn btn-sub-ctrl toggle-active" type="button" title="リピート切替（同フォルダ内ループ / 終了時停止）">
-              <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-            </button>
-          </div>
+              <!-- 停止 -->
+              <button id="btn-stop" class="wood-btn btn-sub-ctrl" type="button" title="停止">
+                <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+              </button>
 
-          <!-- 音量スライダー -->
-          <div class="volume-row">
-            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-            <input id="volume-slider" class="wood-slider" type="range" min="0" max="1" step="0.01" value="0.8">
+              <!-- 次の曲 -->
+              <button id="btn-next" class="wood-btn btn-sub-ctrl" type="button" title="次の曲">
+                <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+              </button>
+
+              <!-- リピート（初期有効: フォルダ内ループ） -->
+              <button id="btn-repeat" class="wood-btn btn-sub-ctrl toggle-active" type="button" title="リピート切替（同フォルダ内ループ / 終了時停止）">
+                <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+              </button>
+            </div>
+
+            <!-- 音量スライダー -->
+            <div class="volume-row">
+              <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <input id="volume-slider" class="wood-slider" type="range" min="0" max="1" step="0.01" value="0.8">
+            </div>
           </div>
 
         </div>
@@ -1847,7 +1820,6 @@
       const STORAGE_KEY_REPEAT = 'mokuplay_repeat';
       const STORAGE_KEY_VOL = 'mokuplay_volume';
       const STORAGE_KEY_AUDIO_MODE = 'mokuplay_audio_mode'; // 'direct' または 'real'
-      const STORAGE_KEY_LAYOUT = 'mokuplay_layout_mode'; // 'two-column' または 'single'
       const SUPPORTED_EXTS = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.webm'];
 
       // iOS / iPadOS デバイスの判定
@@ -1917,9 +1889,7 @@
       const audioModeIcon = document.getElementById('audio-mode-icon');
       const audioModeText = document.getElementById('audio-mode-text');
 
-      const btnToggleLayout = document.getElementById('btn-toggle-layout');
-      const layoutToggleIcon = document.getElementById('layout-toggle-icon');
-      const layoutToggleText = document.getElementById('layout-toggle-text');
+
 
       /* 【有料版向け機能】
       const btnSaveApp = document.getElementById('btn-save-app');
@@ -2586,64 +2556,24 @@
       }
 
       // ==========================================================================
-      // タブ切り替え & レイアウト制御 (手動2画面 / 1画面)
+      // タブ切り替え制御 (選曲画面 / 再生中画面)
       // ==========================================================================
       function switchTab(target) {
-        // 2画面モード（body.two-column-mode）有効時は両画面の表示を徹底維持（非表示競合を防止）
-        if (document.body.classList.contains('two-column-mode')) {
-          viewList.classList.add('active');
-          viewPlayer.classList.add('active');
-          return;
-        }
-
         if (target === 'list') {
           tabListBtn.classList.add('active');
           tabPlayerBtn.classList.remove('active');
           viewList.classList.add('active');
           viewPlayer.classList.remove('active');
+          document.body.classList.remove('is-view-player');
+          document.body.classList.add('is-view-list');
         } else {
           tabPlayerBtn.classList.add('active');
           tabListBtn.classList.remove('active');
           viewPlayer.classList.add('active');
           viewList.classList.remove('active');
+          document.body.classList.remove('is-view-list');
+          document.body.classList.add('is-view-player');
         }
-      }
-
-      function updateLayoutUI() {
-        if (!btnToggleLayout) return;
-        const isTwoCol = document.body.classList.contains('two-column-mode');
-        btnToggleLayout.classList.toggle('active', isTwoCol);
-        if (isTwoCol) {
-          layoutToggleIcon.textContent = '▯';
-          layoutToggleText.textContent = '1画面';
-          btnToggleLayout.title = '現在【2画面表示】です。タップで【1画面表示】に戻します';
-        } else {
-          layoutToggleIcon.textContent = '◫';
-          layoutToggleText.textContent = '2画面';
-          btnToggleLayout.title = '現在【1画面表示】です。タップで【2画面表示】に強制切替します';
-        }
-      }
-
-      function toggleLayoutMode() {
-        const isCurrentlyTwo = document.body.classList.contains('two-column-mode');
-        if (!isCurrentlyTwo) {
-          document.body.classList.add('two-column-mode');
-          localStorage.setItem(STORAGE_KEY_LAYOUT, 'two-column');
-          viewList.classList.add('active');
-          viewPlayer.classList.add('active');
-          showToast('◫ 2画面表示に切り替えました');
-        } else {
-          document.body.classList.remove('two-column-mode');
-          localStorage.setItem(STORAGE_KEY_LAYOUT, 'single');
-          // 1画面時は選曲画面を単独表示
-          switchTab('list');
-          showToast('▯ 1画面表示に切り替えました');
-        }
-        updateLayoutUI();
-      }
-
-      if (btnToggleLayout) {
-        btnToggleLayout.addEventListener('click', toggleLayoutMode);
       }
 
       tabListBtn.addEventListener('click', () => switchTab('list'));
@@ -2785,9 +2715,12 @@
 
           visualizerAnimId = requestAnimationFrame(draw);
 
-          // 描画サイズをコンテナの横幅に動的同期（ワイド画面での解像度ぼやけ防止）
+          // 描画解像度をコンテナの縦横実サイズに動的同期（高解像度・ワイド・縦拡大時のぼやけ防止）
           if (visualizerCanvas.clientWidth && visualizerCanvas.width !== visualizerCanvas.clientWidth) {
             visualizerCanvas.width = visualizerCanvas.clientWidth;
+          }
+          if (visualizerCanvas.clientHeight && visualizerCanvas.height !== visualizerCanvas.clientHeight) {
+            visualizerCanvas.height = visualizerCanvas.clientHeight;
           }
 
           const width = visualizerCanvas.width;
@@ -3075,6 +3008,7 @@
             const idx = playlist.findIndex(p => p.path === fileItem.path);
             if (idx !== -1) {
               playTrackByIndex(idx);
+              switchTab('player');
             }
           });
 
@@ -3790,20 +3724,10 @@
       ========================================================================== */
 
       // --- 起動時初期化 ---
-      const savedLayout = localStorage.getItem(STORAGE_KEY_LAYOUT);
-      if (savedLayout === 'two-column') {
-        document.body.classList.add('two-column-mode');
-        viewList.classList.add('active');
-        viewPlayer.classList.add('active');
-      }
-      updateLayoutUI();
+      switchTab('list');
       updateAudioModeUI();
       startVisualizer();
       checkResumeState();
-
-      window.addEventListener('resize', () => {
-        updateLayoutUI();
-      });
 
     })();
   </script>
